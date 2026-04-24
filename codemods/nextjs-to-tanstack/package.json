@@ -1,0 +1,14 @@
+{
+  "name": "@codemod/nextjs-to-tanstack",
+  "version": "1.0.0",
+  "description": "migrate a project from the Next.js App Router to TanStack",
+  "type": "module",
+  "scripts": {
+    "test": "npx codemod@latest jssg test -l typescript ./scripts/codemod.ts",
+    "check-types": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@codemod.com/jssg-types": "latest",
+    "typescript": "latest"
+  }
+}
