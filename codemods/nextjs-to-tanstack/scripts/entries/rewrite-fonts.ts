@@ -20,9 +20,8 @@
 
 import type { Codemod, Edit, SgNode } from "codemod:ast-grep";
 import type TSX from "codemod:ast-grep/langs/tsx";
-import { dirname } from "path";
 import { getImport } from "../utils/imports.ts";
-import { getFilename } from "../utils/paths.ts";
+import { getFilename, inferCodemodTargetDir } from "../utils/paths.ts";
 import {
   addFontEntries,
   familyToPackageKey,
@@ -30,7 +29,7 @@ import {
   writeSidecar,
   type FontEntry,
 } from "../utils/sidecar.ts";
-import { insertReviewBefore } from "../utils/sentinels.ts";
+import { hasReviewSentinel, insertReviewBefore } from "../utils/sentinels.ts";
 
 const GOOGLE = "next/font/google";
 const LOCAL = "next/font/local";
@@ -133,19 +132,39 @@ const codemod: Codemod<TSX> = async (root) => {
 
   // Remove JSX attribute values that reference <binding>.className /
   // <binding>.variable / <binding>.style — drop the attribute when it's the
-  // whole value, annotate otherwise.
-  for (const { binding } of fontBindings) {
-    for (const attr of rootNode.findAll({ rule: { kind: "jsx_attribute" } })) {
-      const value = findJsxAttrExpressionValue(attr);
-      if (!value) continue;
-      if (isFontMemberRef(value, binding)) {
-        const src = rootNode.text();
-        edits.push(dropJsxAttribute(attr, src));
-      } else if (attrContainsFontMember(attr, binding)) {
+  // whole value; strip next/font refs from template `className={\`...\`}`; else
+  // leave a review sentinel.
+  const bindingNames = fontBindings.map((f) => f.binding);
+  const srcText = rootNode.text();
+
+  for (const attr of rootNode.findAll({ rule: { kind: "jsx_attribute" } })) {
+    const prop = firstChildOfKind(attr, "property_identifier");
+    if (prop?.text() !== "className") continue;
+
+    const value = findJsxAttrExpressionValue(attr);
+    if (!value) continue;
+
+    const onlyFontRef = bindingNames.some((b) => isFontMemberRef(value, b));
+    if (onlyFontRef) {
+      edits.push(dropJsxAttribute(attr, srcText));
+      continue;
+    }
+
+    if (!bindingNames.some((b) => attrContainsFontMember(attr, b))) continue;
+
+    const mixed = tryRewriteMixedClassName(value, bindingNames);
+    if (mixed.kind === "replace") {
+      edits.push({
+        startPos: value.range().start.index,
+        endPos: value.range().end.index,
+        insertedText: mixed.literal,
+      });
+    } else if (mixed.kind === "review") {
+      if (!hasReviewSentinel(srcText, attr, "next/font bindings")) {
         edits.push(
           insertReviewBefore(
             attr,
-            `className references removed font binding "${binding}" — replace with Tailwind --font-* classes or string literal`
+            "className still references removed next/font bindings — replace with Tailwind font utilities or literals"
           )
         );
       }
@@ -171,7 +190,7 @@ const codemod: Codemod<TSX> = async (root) => {
   }
 
   if (fontEntries.length > 0) {
-    const targetDir = inferTargetDir(root);
+    const targetDir = inferCodemodTargetDir(getFilename(root));
     const state = readSidecar(targetDir);
     const merged = addFontEntries(state, fontEntries);
     writeSidecar(targetDir, merged);
@@ -238,6 +257,50 @@ function attrContainsFontMember(attr: SgNode<TSX>, binding: string): boolean {
   );
 }
 
+/**
+ * Rewrite `className={\`...${font.variable}...\`}` after font bindings were removed.
+ * Only template literals without remaining `${...}` holes are rewritten; anything
+ * else gets a manual review marker.
+ */
+function tryRewriteMixedClassName(
+  expr: SgNode<TSX>,
+  bindings: string[],
+): { kind: "replace"; literal: string } | { kind: "review" } {
+  if (!expr.is("template_string")) {
+    return { kind: "review" };
+  }
+
+  let s = expr.text();
+  for (const b of bindings) {
+    const re = new RegExp(
+      `\\$\\{\\s*${escapeRegex(b)}\\s*\\.\\s*(?:variable|className|style)\\s*\\}`,
+      "g",
+    );
+    s = s.replace(re, "");
+  }
+
+  if (s.startsWith("`") && s.endsWith("`")) {
+    s = s.slice(1, -1);
+  }
+  s = s.replace(/\s+/g, " ").trim();
+
+  if (s.includes("${")) {
+    return { kind: "review" };
+  }
+
+  for (const b of bindings) {
+    if (new RegExp(`\\b${escapeRegex(b)}\\s*\\.`).test(s)) {
+      return { kind: "review" };
+    }
+  }
+
+  if (s.length === 0) {
+    return { kind: "replace", literal: JSON.stringify("font-sans antialiased") };
+  }
+
+  return { kind: "replace", literal: JSON.stringify(s) };
+}
+
 function dropJsxAttribute(attr: SgNode<TSX>, source: string): Edit {
   // Extend backwards to absorb leading whitespace / newline so the opening tag
   // stays clean after removal.
@@ -247,17 +310,6 @@ function dropJsxAttribute(attr: SgNode<TSX>, source: string): Edit {
     start--;
   }
   return { startPos: start, endPos: end, insertedText: "" };
-}
-
-function inferTargetDir<T extends Parameters<Codemod<TSX>>[0]>(root: T): string {
-  const file = getFilename(root);
-  // Walk up until we find a path-segment that looks like a repo root. For
-  // jssg runs the workflow target is the invocation CWD; treat the directory
-  // containing `src/` as the root. If no `src/` ancestor exists, fall back to
-  // the file's directory.
-  const srcIdx = file.lastIndexOf("/src/");
-  if (srcIdx > 0) return file.slice(0, srcIdx);
-  return dirname(file);
 }
 
 function firstChildOfKind(parent: SgNode<TSX>, kind: string): SgNode<TSX> | null {

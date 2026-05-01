@@ -1,6 +1,19 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/codemod/codemod/refs/heads/main/schemas/workflow.json
-
+#
+# Globs MUST work when `-t <monorepo-root>` points at the workspace root — e.g.
+# Cal.com `apps/web/app/...` is NOT matched by `app/**` relative to repo root,
+# only by `**/app/**` (parity with next2tanstack `**/*.{ts,tsx}` coverage).
+#
 version: "1"
+
+x-shared-excludes: &shared-excludes
+  - "**/node_modules/**"
+  - "**/.next/**"
+  - "**/dist/**"
+  - "**/build/**"
+  - "**/coverage/**"
+  - "**/.git/**"
+  - "**/.*/**"
 
 nodes:
   - id: cleanup-obsolete-files
@@ -12,18 +25,19 @@ nodes:
           js_file: scripts/entries/cleanup-obsolete-files.ts
           language: tsx
           include:
-            - "next.config.js"
-            - "next.config.mjs"
-            - "next.config.cjs"
-            - "next.config.ts"
-            - "next.config.mts"
-            - "next.config.cts"
-            - "postcss.config.js"
-            - "postcss.config.mjs"
-            - "postcss.config.cjs"
+            - "**/next.config.js"
+            - "**/next.config.mjs"
+            - "**/next.config.cjs"
+            - "**/next.config.ts"
+            - "**/next.config.mts"
+            - "**/next.config.cts"
+            - "**/postcss.config.js"
+            - "**/postcss.config.mjs"
+            - "**/postcss.config.cjs"
+          exclude: *shared-excludes
 
   - id: scaffold-tanstack-files
-    name: Create vite.config.ts and src/router.tsx
+    name: Create vite.config.ts and router.tsx (TanStack Start scaffold)
     type: automatic
     depends_on: [cleanup-obsolete-files]
     steps:
@@ -31,7 +45,9 @@ nodes:
         js-ast-grep:
           js_file: scripts/entries/scaffold-tanstack-files.ts
           language: json
-          include: ["package.json"]
+          include:
+            - "**/package.json"
+          exclude: *shared-excludes
 
   # ---- Structural rewrites (file-shape-changing, ordered) ----
 
@@ -44,7 +60,12 @@ nodes:
         js-ast-grep:
           js_file: scripts/entries/rewrite-root-layout.ts
           language: tsx
-          include: ["src/app/layout.tsx", "src/app/layout.jsx"]
+          include:
+            - "**/src/app/layout.tsx"
+            - "**/src/app/layout.jsx"
+            - "**/app/layout.tsx"
+            - "**/app/layout.jsx"
+          exclude: *shared-excludes
 
   - id: rewrite-api-routes
     name: R6 — Convert route.ts to createFileRoute handlers
@@ -55,7 +76,12 @@ nodes:
         js-ast-grep:
           js_file: scripts/entries/rewrite-api-routes.ts
           language: tsx
-          include: ["src/app/**/route.ts", "src/app/**/route.js"]
+          include:
+            - "**/src/app/**/route.ts"
+            - "**/src/app/**/route.js"
+            - "**/app/**/route.ts"
+            - "**/app/**/route.js"
+          exclude: *shared-excludes
 
   - id: rewrite-pages
     name: R2 — Wrap page components in createFileRoute + rename
@@ -66,21 +92,67 @@ nodes:
         js-ast-grep:
           js_file: scripts/entries/rewrite-pages.ts
           language: tsx
-          include: ["src/app/**/page.tsx", "src/app/**/page.jsx"]
+          include:
+            - "**/src/app/**/page.tsx"
+            - "**/src/app/**/page.jsx"
+            - "**/app/**/page.tsx"
+            - "**/app/**/page.jsx"
+          exclude: *shared-excludes
+
+  - id: rewrite-special-next-files
+    name: R2b — loading / error / not-found / template.tsx (next2tanstack parity)
+    type: automatic
+    depends_on: [rewrite-pages]
+    steps:
+      - name: Map Next special routes to TanStack route modules (template.tsx best-effort)
+        js-ast-grep:
+          js_file: scripts/entries/rewrite-special-next-files.ts
+          language: tsx
+          include:
+            - "**/src/app/loading.tsx"
+            - "**/src/app/error.tsx"
+            - "**/src/app/not-found.tsx"
+            - "**/src/app/template.tsx"
+            - "**/src/app/**/loading.tsx"
+            - "**/src/app/**/error.tsx"
+            - "**/src/app/**/not-found.tsx"
+            - "**/src/app/**/template.tsx"
+            - "**/app/loading.tsx"
+            - "**/app/error.tsx"
+            - "**/app/not-found.tsx"
+            - "**/app/template.tsx"
+            - "**/app/**/loading.tsx"
+            - "**/app/**/error.tsx"
+            - "**/app/**/not-found.tsx"
+            - "**/app/**/template.tsx"
+          exclude: *shared-excludes
 
   # ---- Post-structure rewrites (operate on already-renamed files) ----
 
   - id: rewrite-dynamic-params
     name: R3 — Rewrite params / searchParams to Route hooks
     type: automatic
-    depends_on: [rewrite-pages]
+    depends_on: [rewrite-special-next-files]
     steps:
       - name: Replace await params with Route.useParams / Route.useSearch
         js-ast-grep:
           js_file: scripts/entries/rewrite-dynamic-params.ts
           language: tsx
-          include: ["src/app/**/*.tsx", "src/app/**/*.jsx"]
-          exclude: ["src/app/__root.tsx"]
+          include:
+            - "**/src/app/**/*.tsx"
+            - "**/src/app/**/*.jsx"
+            - "**/app/**/*.tsx"
+            - "**/app/**/*.jsx"
+          exclude:
+            - "**/node_modules/**"
+            - "**/.next/**"
+            - "**/dist/**"
+            - "**/build/**"
+            - "**/coverage/**"
+            - "**/.git/**"
+            - "**/.*/**"
+            - "**/src/app/__root.tsx"
+            - "**/app/__root.tsx"
 
   - id: rewrite-metadata
     name: R7 — Convert `export const metadata` to head() config
@@ -91,20 +163,30 @@ nodes:
         js-ast-grep:
           js_file: scripts/entries/rewrite-metadata.ts
           language: tsx
-          include: ["src/app/__root.tsx", "src/app/**/*.tsx"]
+          include:
+            - "**/src/app/__root.tsx"
+            - "**/src/app/**/*.tsx"
+            - "**/app/__root.tsx"
+            - "**/app/**/*.tsx"
+          exclude: *shared-excludes
 
   - id: annotate-async-pages
-    name: R10 — Leave TODO on async Page components
+    name: R10 — Async loaders (manual follow-up placeholder)
     type: automatic
     depends_on: [rewrite-metadata]
     steps:
-      - name: Insert Tier-2 TODO (no code rewrite)
+      - name: No-op (automatic Route.loader extraction is intentionally skipped)
         js-ast-grep:
           js_file: scripts/entries/annotate-async-pages.ts
           language: tsx
-          include: ["src/app/**/*.tsx", "src/app/**/*.jsx"]
+          include:
+            - "**/src/app/**/*.tsx"
+            - "**/src/app/**/*.jsx"
+            - "**/app/**/*.tsx"
+            - "**/app/**/*.jsx"
+          exclude: *shared-excludes
 
-  # ---- Cross-cutting rewrites (operate anywhere under src/) ----
+  # ---- Cross-cutting rewrites (deep src/ + app dirs, any depth under target) ----
 
   - id: rewrite-fonts
     name: R9 — Strip next/font and record font names for later steps
@@ -115,7 +197,16 @@ nodes:
         js-ast-grep:
           js_file: scripts/entries/rewrite-fonts.ts
           language: tsx
-          include: ["src/**/*.tsx", "src/**/*.jsx", "src/**/*.ts", "src/**/*.js"]
+          include:
+            - "**/src/**/*.tsx"
+            - "**/src/**/*.jsx"
+            - "**/src/**/*.ts"
+            - "**/src/**/*.js"
+            - "**/app/**/*.tsx"
+            - "**/app/**/*.jsx"
+            - "**/app/**/*.ts"
+            - "**/app/**/*.js"
+          exclude: *shared-excludes
 
   - id: rewrite-server-fns
     name: R8 — Wrap "use server" exports in createServerFn
@@ -127,7 +218,12 @@ nodes:
           js_file: scripts/entries/rewrite-server-fns.ts
           language: tsx
           semantic_analysis: workspace
-          include: ["src/**/*.ts", "src/**/*.tsx"]
+          include:
+            - "**/src/**/*.ts"
+            - "**/src/**/*.tsx"
+            - "**/app/**/*.ts"
+            - "**/app/**/*.tsx"
+          exclude: *shared-excludes
 
   - id: rewrite-link-image
     name: R4 + R5 — Swap next/link and next/image to TanStack / unpic
@@ -139,20 +235,46 @@ nodes:
           js_file: scripts/entries/rewrite-link-image.ts
           language: tsx
           semantic_analysis: workspace
-          include: ["src/**/*.tsx", "src/**/*.jsx"]
+          include:
+            - "**/src/**/*.tsx"
+            - "**/src/**/*.jsx"
+            - "**/app/**/*.tsx"
+            - "**/app/**/*.jsx"
+          exclude: *shared-excludes
 
-  # ---- Companion-file patches (read sidecar state) ----
+  - id: rewrite-next-navigation
+    name: R4b — next/navigation hooks → TanStack Router
+    type: automatic
+    depends_on: [rewrite-link-image]
+    steps:
+      - name: Migrate usePathname / useSearchParams / useRouter imports
+        js-ast-grep:
+          js_file: scripts/entries/rewrite-next-navigation.ts
+          language: tsx
+          include:
+            - "**/src/**/*.tsx"
+            - "**/src/**/*.jsx"
+            - "**/app/**/*.tsx"
+            - "**/app/**/*.jsx"
+          exclude: *shared-excludes
+
+  # ---- Static assets + companion patches ----
 
   - id: patch-globals-css
     name: R12 — Inject @fontsource and @theme blocks
     type: automatic
-    depends_on: [rewrite-link-image]
+    depends_on: [rewrite-next-navigation]
     steps:
       - name: Add font imports to globals.css
         js-ast-grep:
           js_file: scripts/entries/patch-globals-css.ts
           language: css
-          include: ["src/app/globals.css", "src/styles/globals.css"]
+          include:
+            - "**/src/app/globals.css"
+            - "**/app/globals.css"
+            - "**/src/styles/globals.css"
+            - "**/styles/globals.css"
+          exclude: *shared-excludes
 
   - id: patch-package-json
     name: R11 — Update dependencies and scripts
@@ -163,7 +285,9 @@ nodes:
         js-ast-grep:
           js_file: scripts/entries/patch-package-json.ts
           language: json
-          include: ["package.json"]
+          include:
+            - "**/package.json"
+          exclude: *shared-excludes
 
   # ---- Finalisation ----
 
@@ -176,4 +300,6 @@ nodes:
         js-ast-grep:
           js_file: scripts/entries/finalize-cleanup.ts
           language: json
-          include: ["package.json"]
+          include:
+            - "**/package.json"
+          exclude: *shared-excludes

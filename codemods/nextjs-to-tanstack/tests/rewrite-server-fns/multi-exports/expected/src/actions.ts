@@ -1,12 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 
 
-// CODEMOD: review — server fn — add `.validator(...)` before `.handler(...)` if it accepts params
 export const create = createServerFn().handler(async () => {
   return true;
 });
 
-// CODEMOD: review — server fn — add `.validator(...)` before `.handler(...)` if it accepts params
+// TanStack migration note: server handler — add `.validator(...)` before `.handler(...)` when this accepts runtime inputs
 export const remove = createServerFn().handler(async (id: string) => {
   return null;
 });

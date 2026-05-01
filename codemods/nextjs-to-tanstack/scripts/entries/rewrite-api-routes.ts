@@ -19,6 +19,7 @@ import {
   computeRoutePath,
   detectNextFileKind,
 } from "../utils/route-path.ts";
+import { ensureParentDir } from "../utils/ensure-parent-dir.ts";
 import { getAppRelativePath, resolveRenameTarget } from "../utils/paths.ts";
 import { insertTodoBefore } from "../utils/sentinels.ts";
 
@@ -110,9 +111,11 @@ const codemod: Codemod<TSX> = async (root) => {
   }
 
   const newPath = resolveRenameTarget(root, routeInfo.newPath);
+  ensureParentDir(newPath);
+  const out = rootNode.commitEdits(edits);
   root.rename(newPath);
 
-  return rootNode.commitEdits(edits);
+  return out;
 };
 
 export default codemod;

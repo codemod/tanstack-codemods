@@ -6,12 +6,36 @@
  * same code paths work on Windows hosts.
  */
 
+import { dirname } from "path";
 import type { SgRoot, TypesMap } from "codemod:ast-grep";
 
 const SRC_APP = "/src/app/";
 
 export function normalizePath(path: string): string {
   return path.replace(/\\/g, "/");
+}
+
+/** True for POSIX absolute paths or Windows `C:/...` after normalization. */
+export function isAbsoluteNormalizedPath(path: string): boolean {
+  const n = normalizePath(path);
+  return n.startsWith("/") || /^[A-Za-z]:\//.test(n);
+}
+
+/**
+ * Directory where `.codemod/state.json` should live: the package root (parent
+ * of `src/` or of `app/` when there is no `src/` prefix before the App Router).
+ */
+export function inferCodemodTargetDir(fileAbs: string): string {
+  const n = normalizePath(fileAbs);
+  const srcIdx = n.lastIndexOf("/src/");
+  if (srcIdx > 0) {
+    return n.slice(0, srcIdx);
+  }
+  const appIdx = n.lastIndexOf("/app/");
+  if (appIdx > 0) {
+    return n.slice(0, appIdx);
+  }
+  return dirname(fileAbs);
 }
 
 export function getFilename<T extends TypesMap>(root: SgRoot<T>): string {
@@ -46,6 +70,10 @@ export function resolveRenameTarget<T extends TypesMap>(
   root: SgRoot<T>,
   computedNewPath: string,
 ): string {
+  const normalized = normalizePath(computedNewPath);
+  if (isAbsoluteNormalizedPath(normalized)) {
+    return normalized;
+  }
   const file = getFilename(root);
   const idx = file.lastIndexOf(SRC_APP);
   if (idx === -1) {

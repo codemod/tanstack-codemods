@@ -1,20 +1,17 @@
 /**
- * Two-tier safety markers:
- *
- *  - Tier 1 ("CODEMOD: review"): the codemod performed the edit; a reviewer
- *    should verify the field coverage / naming / etc.
- *  - Tier 2 ("TODO [CODEMOD]"): the codemod refused to perform the edit; the
- *    user must handle this change by hand.
- *
- * Every sentinel uses a stable prefix so `rg 'CODEMOD: review'` and
- * `rg 'TODO \[CODEMOD\]'` surface every follow-up in one place at the end
- * of the run.
+ * Lightweight migration reminders inserted when the codemod can only go part
+ * of the way automatically. Tier 1 prefixes lines where the AST transform was
+ * applied but semantics may still need a human once-over; Tier 2 covers cases
+ * where we bail on an unsafe rewrite. Both tiers share searchable prefixes so
+ * you can skim the codebase after a run (`rg 'TanStack migration note:'`).
  */
 
 import type { Edit, SgNode, TypesMap } from "codemod:ast-grep";
 
-const REVIEW_PREFIX = "// CODEMOD: review — ";
-const TODO_PREFIX = "// TODO [CODEMOD]: ";
+/** Public so entry scripts can build aligned single-line prefixes. */
+export const REVIEW_PREFIX = "// TanStack migration note: ";
+
+export const TODO_PREFIX = "// TanStack migration note: ";
 
 type AnyNode = SgNode<TypesMap>;
 

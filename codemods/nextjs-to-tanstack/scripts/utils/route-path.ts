@@ -6,6 +6,7 @@
  *   src/app/posts/page.tsx                  → src/app/posts.tsx             "/posts"
  *   src/app/posts/[slug]/page.tsx           → src/app/posts/$slug.tsx       "/posts/$slug"
  *   src/app/posts/[...slug]/page.tsx        → src/app/posts/$.tsx           "/posts/$"
+ *   src/app/prefix/[[...slug]]/page.tsx     → src/app/prefix/$.tsx + sibling index.tsx that redirects empty splat "/prefix/$"
  *   src/app/(marketing)/about/page.tsx      → src/app/about.tsx             "/about"
  *   src/app/api/hello/route.ts              → src/app/api/hello.ts          "/api/hello"
  *   src/app/layout.tsx                      → src/app/__root.tsx            (root)
@@ -26,6 +27,17 @@ export interface RoutePathResult {
   wasCatchAll: boolean;
   /** Original dynamic segment name, or null. Useful for R3 to restore user names. */
   dynamicSegmentName: string | null;
+  /**
+   * Optional catch-all `[[...name]]` has no single-file equivalent: we emit the
+   * splat route (`…/$.tsx`) plus a sibling `index.tsx` that redirects with an
+   * empty `_splat` so the parent URL still resolves.
+   * Omitted when the splat sits directly under `app/` (nothing to anchor an index sibling).
+   */
+  optionalCatchAllRedirect?: {
+    indexNewPath: string;
+    indexRoutePath: string;
+    splatRoutePath: string;
+  };
 }
 
 const SEG_DYNAMIC = /^\[(?!\.\.\.)([^\]]+)\]$/;
@@ -52,27 +64,118 @@ const detectKind = (fileName: string | undefined): NextFileKind => {
   return "other";
 };
 
-const translateSegment = (
-  seg: string,
-): { text: string | null; dynamic: string | null; catchAll: boolean; group: boolean } => {
+/** Next App Router auxiliary files ported from next2tanstack-style transforms. */
+export type SpecialRouteFileVariant = "loading" | "error" | "not-found";
+
+export interface SpecialRouteFileResult {
+  /** Repo-relative posix path (`src/app/...`). */
+  newPath: string;
+  routePath: string;
+  /** Key used in `createFileRoute(...)({ ... })`. */
+  routeOptionProperty: "pendingComponent" | "errorComponent" | "notFoundComponent";
+  variant: SpecialRouteFileVariant;
+}
+
+export function classifySpecialRouteFileBasename(fileName: string | undefined): SpecialRouteFileVariant | null {
+  if (!fileName) return null;
+  if (/^loading\.(t|j)sx?$/.test(fileName)) return "loading";
+  if (/^error\.(t|j)sx?$/.test(fileName)) return "error";
+  if (/^not-found\.(t|j)sx?$/.test(fileName)) return "not-found";
+  return null;
+}
+
+type SegmentTranslation = {
+  text: string | null;
+  dynamic: string | null;
+  catchAll: boolean;
+  optionalCatchAll: boolean;
+  group: boolean;
+};
+
+const translateSegment = (seg: string): SegmentTranslation => {
   const group = SEG_GROUP.exec(seg);
   if (group) {
-    return { text: null, dynamic: null, catchAll: false, group: true };
+    return { text: null, dynamic: null, catchAll: false, optionalCatchAll: false, group: true };
+  }
+
+  const optionalCatchAll = /^\[\[\.\.\.([^\]]+)\]\]$/.exec(seg);
+  if (optionalCatchAll) {
+    const name = optionalCatchAll[1] ?? "";
+    return { text: "$", dynamic: name, catchAll: true, optionalCatchAll: true, group: false };
   }
 
   const catchAll = SEG_CATCHALL.exec(seg);
   if (catchAll) {
-    return { text: "$", dynamic: catchAll[1] ?? null, catchAll: true, group: false };
+    return { text: "$", dynamic: catchAll[1] ?? null, catchAll: true, optionalCatchAll: false, group: false };
   }
 
   const dynamic = SEG_DYNAMIC.exec(seg);
   if (dynamic) {
     const name = dynamic[1] ?? "";
-    return { text: `$${name}`, dynamic: name, catchAll: false, group: false };
+    return { text: `$${name}`, dynamic: name, catchAll: false, optionalCatchAll: false, group: false };
   }
 
-  return { text: seg, dynamic: null, catchAll: false, group: false };
+  return { text: seg, dynamic: null, catchAll: false, optionalCatchAll: false, group: false };
 };
+
+/**
+ * Map `loading.tsx` / `error.tsx` / `not-found.tsx` to TanStack Start route
+ * module files (`-pending.tsx`, `-error.tsx`, `-not-found.tsx`) while keeping the
+ * same logical `createFileRoute` path as sibling `page.tsx` would have used.
+ *
+ * Mirrors conventions from `/Users/amir/Desktop/codemod/next2tanstack`.
+ */
+export function computeSpecialRouteFileTransform(relativePath: string): SpecialRouteFileResult | null {
+  const split = stripAppPrefix(relativePath);
+  if (!split) return null;
+  const { head, rest } = split;
+
+  const fileName = rest.at(-1);
+  const variant = classifySpecialRouteFileBasename(fileName);
+  if (!variant) return null;
+
+  const dirSegs = rest.slice(0, -1);
+  const ext = fileName!.slice(fileName!.indexOf("."));
+
+  for (const seg of dirSegs) {
+    if (seg.startsWith("@")) return null;
+    if (/^\(\.{1,3}\)/.test(seg)) return null;
+  }
+
+  if (dirSegs.length > 0 && dirSegs[0] === "api") return null;
+
+  const translated: string[] = [];
+  for (const seg of dirSegs) {
+    const t = translateSegment(seg);
+    if (t.group) continue;
+    if (t.text === null) return null;
+    translated.push(t.text);
+  }
+
+  const routePath = translated.length === 0 ? "/" : `/${translated.join("/")}`;
+
+  const leaf =
+    variant === "loading"
+      ? `-pending${ext}`
+      : variant === "error"
+        ? `-error${ext}`
+        : `-not-found${ext}`;
+  const dirPart = translated.length ? `${translated.join("/")}/` : "";
+
+  const routeOptionProperty =
+    variant === "loading"
+      ? "pendingComponent"
+      : variant === "error"
+        ? "errorComponent"
+        : "notFoundComponent";
+
+  return {
+    newPath: `${head}/${dirPart}${leaf}`,
+    routePath,
+    routeOptionProperty,
+    variant,
+  };
+}
 
 /**
  * Given the relative path of a Next App Router source file, return the
@@ -115,12 +218,14 @@ export function computeRoutePath(relativePath: string): RoutePathResult | null {
   const translated: string[] = [];
   let wasCatchAll = false;
   let dynamicName: string | null = null;
+  let hasOptionalCatchAll = false;
   for (const seg of dirSegs) {
     const t = translateSegment(seg);
     if (t.group) continue;
     if (t.text === null) return null;
     translated.push(t.text);
     if (t.catchAll) wasCatchAll = true;
+    if (t.optionalCatchAll) hasOptionalCatchAll = true;
     if (t.dynamic) dynamicName = t.dynamic;
   }
 
@@ -140,13 +245,22 @@ export function computeRoutePath(relativePath: string): RoutePathResult | null {
     }
     const newDir = parentDir.length === 0 ? head : `${head}/${parentDir.join("/")}`;
     const routeDir = parentDir.length === 0 ? "" : `/${parentDir.join("/")}`;
-    return {
+    const splatRoutePath = `${routeDir}/${leaf}`;
+    const pageResult: RoutePathResult = {
       newPath: `${newDir}/${leaf}${ext}`,
-      routePath: `${routeDir}/${leaf}`,
+      routePath: splatRoutePath,
       kind,
       wasCatchAll,
       dynamicSegmentName: dynamicName,
     };
+    if (hasOptionalCatchAll && parentDir.length > 0) {
+      pageResult.optionalCatchAllRedirect = {
+        indexNewPath: `${newDir}/index${ext}`,
+        indexRoutePath: routeDir,
+        splatRoutePath,
+      };
+    }
+    return pageResult;
   }
 
   // route.ts → <parent>.ts

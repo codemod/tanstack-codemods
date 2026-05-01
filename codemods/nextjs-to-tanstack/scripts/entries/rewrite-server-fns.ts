@@ -14,14 +14,15 @@
  *   export const create = createServerFn().handler(async (x: Input) => { ... });
  *   export const remove = createServerFn().handler(async (id: string) => { ... });
  *
- * A `CODEMOD: review` sentinel is placed above each rewritten export so
- * authors can plug in input validation (TanStack exposes `.validator()` for
- * that) — we can't infer the expected schema from the Next code.
+ * A concise migration reminder is optionally placed above rewritten exports when
+ * the handler accepts runtime parameters — authors can attach a TanStack
+ * `.validator(...)` alongside `.handler(...)`.
  */
 
 import type { Codemod, Edit, SgNode } from "codemod:ast-grep";
 import type TSX from "codemod:ast-grep/langs/tsx";
 import { addImport } from "../utils/imports.ts";
+import { REVIEW_PREFIX } from "../utils/sentinels.ts";
 
 const TANSTACK_START = "@tanstack/react-start";
 
@@ -107,18 +108,36 @@ function findUseServerDirective(rootNode: SgNode<TSX>): SgNode<TSX> | null {
   return first;
 }
 
-const REVIEW_LINE =
-  "// CODEMOD: review — server fn — add `.validator(...)` before `.handler(...)` if it accepts params";
+const VALIDATOR_NOTE =
+  "server handler — add `.validator(...)` before `.handler(...)` when this accepts runtime inputs";
+
+/** True when parentheses contain anything other than pure whitespace */
+function paramsNeedValidatorHint(parametersText: string): boolean {
+  const t = parametersText.trim();
+  if (!(t.startsWith("(") && t.endsWith(")"))) return true;
+  return t.slice(1, -1).trim().length > 0;
+}
+
+function validatorLeadLine(anchor: SgNode<TSX>, parameterText: string): string {
+  if (!paramsNeedValidatorHint(parameterText)) return "";
+  const column = anchor.range().start.column;
+  const indent = " ".repeat(column);
+  return `${REVIEW_PREFIX}${VALIDATOR_NOTE}\n${indent}`;
+}
 
 function wrapArrow(exportStmt: SgNode<TSX>, arrow: SgNode<TSX>): Edit[] {
-  const col = exportStmt.range().start.column;
-  const indent = " ".repeat(col);
-  return [
-    {
+  const parameterText = arrow.field("parameters")?.text() ?? "()";
+  const lead = validatorLeadLine(exportStmt, parameterText);
+
+  const edits: Edit[] = [];
+  if (lead.length > 0) {
+    edits.push({
       startPos: exportStmt.range().start.index,
       endPos: exportStmt.range().start.index,
-      insertedText: `${REVIEW_LINE}\n${indent}`,
-    },
+      insertedText: lead,
+    });
+  }
+  edits.push(
     {
       startPos: arrow.range().start.index,
       endPos: arrow.range().start.index,
@@ -129,7 +148,8 @@ function wrapArrow(exportStmt: SgNode<TSX>, arrow: SgNode<TSX>): Edit[] {
       endPos: arrow.range().end.index,
       insertedText: ")",
     },
-  ];
+  );
+  return edits;
 }
 
 function wrapFunctionDeclaration(exportStmt: SgNode<TSX>, fn: SgNode<TSX>): Edit | null {
@@ -140,11 +160,11 @@ function wrapFunctionDeclaration(exportStmt: SgNode<TSX>, fn: SgNode<TSX>): Edit
 
   const isAsync = fn.children().some((c) => c.kind() === "async");
   const asyncKw = isAsync ? "async " : "";
-  const col = exportStmt.range().start.column;
-  const indent = " ".repeat(col);
+
+  const reviewLead = validatorLeadLine(exportStmt, params);
 
   const replacement =
-    `${REVIEW_LINE}\n${indent}` +
+    `${reviewLead}` +
     `export const ${fnName} = createServerFn().handler(${asyncKw}${params} => ${body});`;
 
   return {

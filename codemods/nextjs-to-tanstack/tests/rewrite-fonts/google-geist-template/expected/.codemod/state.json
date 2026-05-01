@@ -1,0 +1,16 @@
+{
+  "fonts": [
+    {
+      "importSource": "next/font/google",
+      "family": "Geist",
+      "packageKey": "geist",
+      "variable": "--font-geist-sans"
+    },
+    {
+      "importSource": "next/font/google",
+      "family": "Geist_Mono",
+      "packageKey": "geist-mono",
+      "variable": "--font-geist-mono"
+    }
+  ]
+}

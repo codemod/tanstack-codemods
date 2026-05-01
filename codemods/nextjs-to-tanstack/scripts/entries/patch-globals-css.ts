@@ -1,18 +1,20 @@
 /**
- * R12 — Patch `src/app/globals.css` (or `src/styles/globals.css`) with the
- * Fontsource imports and Tailwind `@theme inline` blocks recorded by R9.
+ * R12 — Patch `globals.css` with the Fontsource imports and Tailwind `@theme
+ * inline` blocks recorded by R9.
+ *
+ * Targets: `src/app/globals.css`, `app/globals.css`, `src/styles/globals.css`,
+ * and `styles/globals.css` (covers create-next-app layouts and Cal-style trees).
  *
  * CSS is line-oriented — we detect existing `@import "@fontsource-variable/…"`
  * statements and skip them, then append whatever is missing at the top of the
  * file (after any pre-existing `@import` line). A Tailwind `@theme inline`
- * block with `--font-<variable>: '<Family>', sans-serif;` is appended too,
- * guarded by a `CODEMOD: review` comment because the Fontsource package
- * existence should be verified on npm.
+ * block with `--font-<variable>: '<Family>', sans-serif;` is appended too when
+ * the sidecar records variable font metadata.
  */
 
 import type { Codemod, Edit } from "codemod:ast-grep";
 import type CSS from "codemod:ast-grep/langs/css";
-import { getFilename } from "../utils/paths.ts";
+import { getFilename, inferCodemodTargetDir } from "../utils/paths.ts";
 import { readSidecar, type FontEntry } from "../utils/sidecar.ts";
 
 const codemod: Codemod<CSS> = async (root) => {
@@ -22,7 +24,7 @@ const codemod: Codemod<CSS> = async (root) => {
   const rootNode = root.root();
   const source = rootNode.text();
 
-  const targetDir = inferTargetDir(file);
+  const targetDir = inferCodemodTargetDir(file);
   const sidecar = readSidecar(targetDir);
   if (sidecar.fonts.length === 0) return null;
 
@@ -55,10 +57,7 @@ function buildImportBlock(source: string, fonts: FontEntry[]): string {
     const pkg = `@fontsource-variable/${font.packageKey}`;
     const rx = new RegExp(`@import\\s+["']${escapeRegex(pkg)}["']`);
     if (rx.test(source)) continue;
-    lines.push(
-      `/* CODEMOD: review — verify package ${pkg} exists on npm */`,
-      `@import "${pkg}";`,
-    );
+    lines.push(`@import "${pkg}";`);
   }
   if (lines.length === 0) return "";
   return `${lines.join("\n")}\n`;
@@ -96,13 +95,6 @@ function findAfterLastImport(source: string): number {
     lastEnd = match.index + match[0].length;
   }
   return lastEnd;
-}
-
-function inferTargetDir(cssPath: string): string {
-  const idx = cssPath.lastIndexOf("/src/");
-  if (idx > 0) return cssPath.slice(0, idx);
-  const dir = cssPath.slice(0, cssPath.lastIndexOf("/"));
-  return dir || ".";
 }
 
 function escapeRegex(s: string): string {

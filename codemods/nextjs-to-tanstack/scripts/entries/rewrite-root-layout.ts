@@ -23,6 +23,7 @@ import {
   addDefaultImport,
   addImport,
 } from "../utils/imports.ts";
+import { ensureParentDir } from "../utils/ensure-parent-dir.ts";
 import { getAppRelativePath, resolveRenameTarget } from "../utils/paths.ts";
 import { insertTodoBefore } from "../utils/sentinels.ts";
 
@@ -91,8 +92,11 @@ const codemod: Codemod<TSX> = async (root) => {
   }
 
   const newRelative = relative.replace(/layout\.(t|j)sx$/, "__root.$1sx");
-  root.rename(resolveRenameTarget(root, newRelative));
-  return rootNode.commitEdits(edits);
+  const target = resolveRenameTarget(root, newRelative);
+  ensureParentDir(target);
+  const out = rootNode.commitEdits(edits);
+  root.rename(target);
+  return out;
 };
 
 const PRELUDE_IMPORTS =

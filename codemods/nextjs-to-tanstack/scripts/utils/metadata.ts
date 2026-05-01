@@ -4,8 +4,8 @@
  *
  * The input is always an AST node (an `object` expression) — we never parse
  * or stringify the source text. Every nested value that can't be mapped
- * deterministically becomes a `// CODEMOD: review` note returned alongside
- * the generated head payload.
+ * deterministically surfaces as an `unmapped` key so the caller can emit a
+ * short `TanStack migration note` comment next to the route definition.
  */
 
 import type { SgNode, TypesMap } from "codemod:ast-grep";

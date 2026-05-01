@@ -10,13 +10,16 @@
  * focused on the rename + shape change.
  */
 
+import { writeFileSync, readFileSync } from "fs";
 import type { Codemod, Edit, SgNode } from "codemod:ast-grep";
 import type TSX from "codemod:ast-grep/langs/tsx";
 import { addImport } from "../utils/imports.ts";
 import {
   computeRoutePath,
   detectNextFileKind,
+  type RoutePathResult,
 } from "../utils/route-path.ts";
+import { ensureParentDir } from "../utils/ensure-parent-dir.ts";
 import { getAppRelativePath, resolveRenameTarget } from "../utils/paths.ts";
 import { insertTodoBefore } from "../utils/sentinels.ts";
 
@@ -61,7 +64,7 @@ const codemod: Codemod<TSX> = async (root) => {
     // declaration that references the identifier. Anything else → TODO.
     const ident = firstChildOfKind(defaultExport, "identifier");
     if (!ident) return emitTodo(rootNode, defaultExport);
-    return wrapIdentifierExport(root, rootNode, defaultExport, ident, routeInfo.routePath, routeInfo.newPath);
+    return wrapIdentifierExport(root, rootNode, defaultExport, ident, routeInfo);
   }
 
   const fnName = fn.field("name")?.text();
@@ -109,8 +112,11 @@ const codemod: Codemod<TSX> = async (root) => {
   }
 
   const newPath = resolveRenameTarget(root, routeInfo.newPath);
+  ensureParentDir(newPath);
+  const out = rootNode.commitEdits(edits);
   root.rename(newPath);
-  return rootNode.commitEdits(edits);
+  writeOptionalCatchAllIndex(root, routeInfo.optionalCatchAllRedirect);
+  return out;
 };
 
 export default codemod;
@@ -120,10 +126,10 @@ function wrapIdentifierExport(
   rootNode: SgNode<TSX>,
   defaultExport: SgNode<TSX>,
   identifier: SgNode<TSX>,
-  routePath: string,
-  newRelativePath: string,
+  routeInfo: RoutePathResult,
 ): string {
   const name = identifier.text();
+  const routePath = routeInfo.routePath!;
   const block = buildRouteBlock(routePath, name);
   const edits: Edit[] = [];
 
@@ -149,8 +155,12 @@ function wrapIdentifierExport(
     });
   }
 
-  root.rename(resolveRenameTarget(root, newRelativePath));
-  return rootNode.commitEdits(edits);
+  const renamed = resolveRenameTarget(root, routeInfo.newPath);
+  ensureParentDir(renamed);
+  const out = rootNode.commitEdits(edits);
+  root.rename(renamed);
+  writeOptionalCatchAllIndex(root, routeInfo.optionalCatchAllRedirect);
+  return out;
 }
 
 function buildRouteBlock(routePath: string, componentName: string): string {
@@ -189,8 +199,44 @@ function emitTodo(rootNode: SgNode<TSX>, nearNode?: SgNode<TSX>): string {
   if (!target) return rootNode.text();
   const edit = insertTodoBefore(
     target,
-    "page shape not recognised; wrap with createFileRoute manually",
+    "page shape was not rewritten — wrap the default export with createFileRoute manually",
     PAGES_DOC,
   );
   return rootNode.commitEdits([edit]);
+}
+
+function buildOptionalCatchAllIndexSource(
+  indexRoutePath: string,
+  splatRoutePath: string,
+): string {
+  return (
+    `import { createFileRoute, redirect } from "${TANSTACK_ROUTER}";\n\n` +
+    `export const Route = createFileRoute(${JSON.stringify(indexRoutePath)})({\n` +
+    `  beforeLoad: () => {\n` +
+    `    throw redirect({\n` +
+    `      to: ${JSON.stringify(splatRoutePath)},\n` +
+    `      params: { _splat: "" },\n` +
+    `    });\n` +
+    `  },\n` +
+    `});\n`
+  );
+}
+
+function writeOptionalCatchAllIndex(
+  root: Parameters<Codemod<TSX>>[0],
+  redirectMeta: RoutePathResult["optionalCatchAllRedirect"],
+): void {
+  if (!redirectMeta) return;
+  const source = buildOptionalCatchAllIndexSource(
+    redirectMeta.indexRoutePath,
+    redirectMeta.splatRoutePath,
+  );
+  const abs = resolveRenameTarget(root, redirectMeta.indexNewPath);
+  ensureParentDir(abs);
+  try {
+    if (readFileSync(abs).toString() === source) return;
+  } catch {
+    /* absent or unreadable — fall through */
+  }
+  writeFileSync(abs, source);
 }

@@ -3,6 +3,7 @@
   "type": "module",
   "scripts": {},
   "dependencies": {
+    "next": "^15.0.0",
     "react": "^19.0.0"
   },
   "devDependencies": {}

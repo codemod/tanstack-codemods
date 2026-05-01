@@ -15,7 +15,8 @@
     "@tanstack/react-start": "latest",
     "vite": "latest",
     "@vitejs/plugin-react": "latest",
-    "nitro": "latest"
+    "nitro": "latest",
+    "@unpic/react": "latest"
   },
   "devDependencies": {
     "typescript": "^5.0.0",

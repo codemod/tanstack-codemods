@@ -20,7 +20,7 @@
  *
  * For catch-all files (`$.tsx`), the destructured key is rewritten to
  * `_splat` — only when the original Next code used a single identifier. A
- * non-trivial destructure emits a Tier-1 review sentinel.
+ * non-trivial destructure emits a short migration reminder.
  */
 
 import type { Codemod, Edit, SgNode } from "codemod:ast-grep";
@@ -259,14 +259,11 @@ function rewriteAwaitStatements(
       if (pattern) {
         const keys = collectDestructureKeys(pattern);
         if (keys.length === 1) {
+          const oldKey = keys[0];
           edits.push(pattern.replace("{ _splat }"));
-          const declStmt = decl.parent();
-          edits.push(
-            insertReviewBefore(
-              declStmt ?? decl,
-              `catch-all: renamed "${keys[0]}" → "_splat"; note that _splat is a slash-joined string, not an array — update downstream usages`,
-            ),
-          );
+          if (oldKey && oldKey !== "_splat") {
+            edits.push(...rewriteCatchAllJoinedParamRefs(fn, oldKey));
+          }
         } else {
           edits.push(
             insertReviewBefore(
@@ -309,5 +306,19 @@ function rewriteAwaitStatements(
     edits.push(value.replace(hookName));
   }
 
+  return edits;
+}
+
+function rewriteCatchAllJoinedParamRefs(pageFn: SgNode<TSX>, oldName: string): Edit[] {
+  const edits: Edit[] = [];
+  for (const call of pageFn.findAll({ rule: { kind: "call_expression" } })) {
+    const callee = call.field("function");
+    if (!callee || callee.kind() !== "member_expression") continue;
+    const obj = callee.field("object");
+    const prop = callee.field("property");
+    if (!obj || obj.kind() !== "identifier" || obj.text() !== oldName) continue;
+    if (!prop || prop.text() !== "join") continue;
+    edits.push(call.replace("_splat"));
+  }
   return edits;
 }

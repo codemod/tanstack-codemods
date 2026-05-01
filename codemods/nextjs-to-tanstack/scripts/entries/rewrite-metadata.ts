@@ -12,9 +12,9 @@
  * The original `export const metadata = {...}` declaration is removed, as is
  * the `import type { Metadata } from "next"` if present.
  *
- * Dynamic / async `generateMetadata` functions are left alone with a
- * Tier-2 TODO — their values can depend on params/searchParams at request
- * time, which a static head() can't express.
+ * Dynamic / async `generateMetadata` exports are intentionally skipped until a
+ * human wires them through `Route` loaders + `head()` — the AST alone cannot
+ * faithfully relocate request-time promises.
  */
 
 import type { Codemod, Edit, SgNode } from "codemod:ast-grep";
@@ -22,10 +22,7 @@ import type TSX from "codemod:ast-grep/langs/tsx";
 import { removeImport } from "../utils/imports.ts";
 import { metadataObjectToHead } from "../utils/metadata.ts";
 import { getAppRelativePath } from "../utils/paths.ts";
-import { insertReviewBefore, insertTodoBefore } from "../utils/sentinels.ts";
-
-const METADATA_DOC =
-  "https://tanstack.com/start/latest/docs/framework/react/guide/head";
+import { insertReviewBefore } from "../utils/sentinels.ts";
 
 const codemod: Codemod<TSX> = async (root) => {
   const relative = getAppRelativePath(root);
@@ -46,16 +43,8 @@ const codemod: Codemod<TSX> = async (root) => {
       },
     },
   });
-  if (generateFn) {
-    const exportStmt = generateFn.ancestors().find((a) => a.kind() === "export_statement");
-    const target = (exportStmt ?? generateFn) as SgNode<TSX>;
-    const edit = insertTodoBefore(
-      target,
-      "dynamic generateMetadata — port to head() with route loader data",
-      METADATA_DOC,
-    );
-    return rootNode.commitEdits([edit]);
-  }
+  // Dynamic metadata requires manual coordination with loaders + head().
+  if (generateFn) return null;
 
   const metadataExport = findMetadataExport(rootNode);
   if (!metadataExport) return null;

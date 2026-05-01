@@ -6,10 +6,16 @@
  * parse → mutate → stringify via the standard library. The `.codemod/state.json`
  * sidecar is consulted for font dependencies written by R9.
  *
+ * Skips package.json files that do not depend on `next` (so monorepo runs
+ * using `** /package.json` globs skip unrelated workspaces).
+ *
+ * Skips patches when other dependencies still imply a Next runtime
+ * (`next-auth`, `@next/fonts`, …) so removing `next` cannot leave broken installs.
+ *
  * Mutations:
  *   - dependencies: remove `next`, `@tailwindcss/postcss`; ensure TanStack
  *     Start deps (`@tanstack/react-router`, `@tanstack/react-start`,
- *     `vite`, `@vitejs/plugin-react`, `nitro`) exist at `"latest"` unless
+ *     `vite`, `@vitejs/plugin-react`, `nitro`, `@unpic/react`) exist at `"latest"` unless
  *     already present with a different version.
  *   - devDependencies: ensure `@tailwindcss/vite` and `tailwindcss` exist.
  *     For each sidecar font, add `@fontsource-variable/<packageKey>` at `"latest"`.
@@ -38,6 +44,7 @@ const RUNTIME_DEPS: Array<[string, string]> = [
   ["vite", "latest"],
   ["@vitejs/plugin-react", "latest"],
   ["nitro", "latest"],
+  ["@unpic/react", "latest"],
 ];
 
 const DEV_DEPS: Array<[string, string]> = [
@@ -62,6 +69,16 @@ const codemod: Codemod<JSON_TYPES> = async (root) => {
   }
 
   const before = JSON.stringify(pkg);
+
+  // Monorepo runs may visit every package.json; only migrate Next.js apps.
+  const hasNext = Boolean(pkg.dependencies?.next ?? pkg.devDependencies?.next);
+  if (!hasNext) {
+    return null;
+  }
+
+  if (hasAdjacentNextDependency(pkg)) {
+    return null;
+  }
 
   // Remove Next-specific deps.
   deleteDep(pkg, "dependencies", "next");
@@ -120,6 +137,24 @@ const codemod: Codemod<JSON_TYPES> = async (root) => {
 
 export default codemod;
 
+/** True while ecosystem packages imply a bundled Next dependency (do not strip `next` alone). */
+function hasAdjacentNextDependency(pkg: PackageJson): boolean {
+  const merged: Record<string, string> = {
+    ...(pkg.dependencies ?? {}),
+    ...(pkg.devDependencies ?? {}),
+  };
+  delete merged.next;
+  delete merged["@tailwindcss/postcss"];
+
+  for (const name of Object.keys(merged)) {
+    if (name.startsWith("next-")) return true;
+    if (name.startsWith("@next/")) return true;
+    // e.g. @sentry/nextjs, @calcom/feature-xyz-next (anything scoped .../next…)
+    if (name.includes("/next")) return true;
+  }
+  return false;
+}
+
 function deleteDep(
   pkg: PackageJson,
   bucket: "dependencies" | "devDependencies",
@@ -151,7 +186,9 @@ function stringifyOrdered(pkg: PackageJson): string {
     "name",
     "version",
     "description",
+    "private",
     "type",
+    "engines",
     "scripts",
     "dependencies",
     "devDependencies",
