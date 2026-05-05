@@ -28,6 +28,12 @@ const codemod: Codemod<TSX> = async (root) => {
     return null;
   }
 
+  // Repo packages often include `**/app/**` folders that aren't TanStack file routes
+  // (atoms, tooling, barrels next to unrelated `export const Route`). Only run brace
+  // repair where a route factory call is clearly present — pure TS barrels like
+  // `libraries/index.ts` must never be truncated.
+  if (!/\bcreate(File|Root|LazyFile)Route\b/.test(source)) return null;
+
   const next = applyRepairRouteTailPipeline(source);
   if (next === source) return null;
 
