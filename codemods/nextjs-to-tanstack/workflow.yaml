@@ -264,7 +264,7 @@ nodes:
     type: automatic
     depends_on: [rewrite-link-image]
     steps:
-      - name: usePathname / useSearchParams / useRouter · redirect / permanentRedirect · inline push|replace
+      - name: next/navigation + next/router, usePathname/useSearch/useRouter/useParams, redirect, notFound, refresh→invalidate
         js-ast-grep:
           js_file: scripts/entries/rewrite-next-navigation.ts
           language: tsx
@@ -283,10 +283,22 @@ nodes:
           include: *cross-cutting-tsx
           exclude: *shared-excludes
 
+  - id: rewrite-next-internal-modules
+    name: R4dist — next/dist + codegen strings (ApiError, path-to-regexp, dynamic import templates)
+    type: automatic
+    depends_on: [rewrite-next-dynamic-script]
+    steps:
+      - name: Replace internal Next paths and pinned dynamic import strings
+        js-ast-grep:
+          js_file: scripts/entries/rewrite-next-internal-modules.ts
+          language: tsx
+          include: *cross-cutting-ts
+          exclude: *shared-excludes
+
   - id: rewrite-next-i18next-imports
     name: R4d — next-i18next → react-i18next (cross-cutting)
     type: automatic
-    depends_on: [rewrite-next-dynamic-script]
+    depends_on: [rewrite-next-internal-modules]
     steps:
       - name: Shared components + all TS/JS — align with bootstrap I18next instance
         js-ast-grep:
@@ -308,11 +320,11 @@ nodes:
           exclude: *shared-excludes
 
   - id: rewrite-next-headers
-    name: R4f — next/headers cookies/headers → Request helpers + bridge import
+    name: R4f — next/headers → @tanstack/start/server getCookie / setCookie / deleteCookie / getCookies / getHeaders
     type: automatic
     depends_on: [rewrite-next-cache]
     steps:
-      - name: cookies().get / headers().get → getCookieFromRequest / readRequestHeader
+      - name: cookies()/headers() → getCookie / setCookie / deleteCookie / getCookies / getHeaders[…]
         js-ast-grep:
           js_file: scripts/entries/rewrite-next-headers.ts
           language: tsx
@@ -331,10 +343,22 @@ nodes:
           include: *cross-cutting-ts
           exclude: *shared-excludes
 
+  - id: rewrite-next-server-vitest
+    name: R4h-bis — Vitest — local NextRequest/NextResponse shims; strip vi.mock(next/server)
+    type: automatic
+    depends_on: [rewrite-next-server]
+    steps:
+      - name: Tests still using NextResponse.next/rewrite or vi.mock(next/server)
+        js-ast-grep:
+          js_file: scripts/entries/rewrite-next-server-vitest.ts
+          language: tsx
+          include: *cross-cutting-ts
+          exclude: *shared-excludes
+
   - id: rewrite-next-og
     name: R4i — next/og → @vercel/og
     type: automatic
-    depends_on: [rewrite-next-server]
+    depends_on: [rewrite-next-server-vitest]
     steps:
       - name: Point OG imports at @vercel/og (package added in R11)
         js-ast-grep:
@@ -391,10 +415,22 @@ nodes:
             - "**/app/**/*.jsx"
           exclude: *shared-excludes
 
+  - id: rewrite-next-types
+    name: R10a-quater — Erase next/types and import type … from "next"
+    type: automatic
+    depends_on: [repair-route-file-tails]
+    steps:
+      - name: Replace Next type-only surface with any; remove imports
+        js-ast-grep:
+          js_file: scripts/entries/rewrite-next-types.ts
+          language: tsx
+          include: *cross-cutting-ts
+          exclude: *shared-excludes
+
   - id: strip-unused-next-imports
     name: R10a-ter — Remove wholly-unused next/* imports
     type: automatic
-    depends_on: [repair-route-file-tails]
+    depends_on: [rewrite-next-types]
     steps:
       - name: Delete import statements when no binding is referenced
         js-ast-grep:

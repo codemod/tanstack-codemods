@@ -3,7 +3,7 @@
  * statement is unused in the file (identifiers, type identifiers, namespace
  * member bases).
  *
- * Runs before R10b TODO annotations so dead imports disappear cleanly.
+ * Runs after \`rewrite-next-types\` (\`next/types\` + type-only \`import type … from "next"\`) and before R10b TODO annotations so dead imports disappear cleanly.
  */
 
 import type { Codemod, Edit, SgNode } from "codemod:ast-grep";

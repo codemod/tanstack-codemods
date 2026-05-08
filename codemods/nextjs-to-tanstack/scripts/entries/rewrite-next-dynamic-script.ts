@@ -14,9 +14,13 @@
 import type { Codemod, Edit, SgNode } from "codemod:ast-grep";
 import type TSX from "codemod:ast-grep/langs/tsx";
 import { addImport, getImport, removeImport } from "../utils/imports.ts";
+import { TODO_PREFIX } from "../utils/sentinels.ts";
 
 const NEXT_DYNAMIC = "next/dynamic";
 const NEXT_SCRIPT = "next/script";
+const NEXT_HEAD = "next/head";
+
+const HEAD_TODO_SENTINEL = "next/head migration (R4c-head)";
 
 const codemod: Codemod<TSX> = async (root) => {
   const rootNode = root.root();
@@ -35,6 +39,12 @@ const codemod: Codemod<TSX> = async (root) => {
 
   const edits: Edit[] = [];
 
+  const headImp = getImport(rootNode, { type: "default", from: NEXT_HEAD });
+  if (headImp && !headImp.isNamespace) {
+    const headEdits = rewriteHead(rootNode, headImp.alias);
+    edits.push(...headEdits);
+  }
+
   if (dynamicAlias) {
     const dynamicEdits = rewriteDynamic(rootNode, dynamicAlias);
     if (dynamicEdits !== "skip") edits.push(...dynamicEdits);
@@ -51,7 +61,69 @@ const codemod: Codemod<TSX> = async (root) => {
 
 export default codemod;
 
+function rewriteHead(rootNode: SgNode<TSX>, alias: string): Edit[] {
+  const source = rootNode.text();
+  const edits: Edit[] = [];
+  const opens = findJsxScriptOpens(rootNode, alias);
+
+  for (const opening of opens) {
+    const openEl = jsxOpeningFromSubject(outerJsxReplacementTarget(opening));
+    if (openEl && countJsxAttributes(openEl) > 0) {
+      return [];
+    }
+  }
+
+  if (!source.includes(HEAD_TODO_SENTINEL)) {
+    edits.push({
+      startPos: 0,
+      endPos: 0,
+      insertedText: `${TODO_PREFIX}${HEAD_TODO_SENTINEL}: move meta tags to TanStack Start head APIs / document title — https://tanstack.com/start/latest/docs/framework/react/migrate-from-next-js\n`,
+    });
+  }
+
+  const rm = removeImport(rootNode, { type: "default", from: NEXT_HEAD });
+  if (rm) edits.push(rm);
+
+  for (const opening of findJsxScriptOpens(rootNode, alias)) {
+    const target = outerJsxReplacementTarget(opening);
+    const openEl = jsxOpeningFromSubject(target);
+    if (!openEl) continue;
+    if (target.kind() === "jsx_self_closing_element") {
+      let ot = openEl.text();
+      ot = ot.replace(
+        new RegExp(`^<\\s*${escapeRegex(alias)}\\s*\\/\\s*>`),
+        "<></>",
+      );
+      edits.push(openEl.replace(ot));
+      continue;
+    }
+    if (target.kind() === "jsx_element") {
+      let ot = openEl.text();
+      ot = ot.replace(
+        new RegExp(`^<\\s*${escapeRegex(alias)}\\s*>`),
+        "<>",
+      );
+      edits.push(openEl.replace(ot));
+      const close = target.children().find((c) => c.kind() === "jsx_closing_element");
+      if (close) {
+        let ct = close.text();
+        ct = ct.replace(new RegExp(`</\\s*${escapeRegex(alias)}\\s*>`, "i"), "</>");
+        if (ct !== close.text()) edits.push(close.replace(ct));
+      }
+    }
+  }
+
+  return edits;
+}
+
+function countJsxAttributes(openEl: SgNode<TSX>): number {
+  return openEl.findAll({ rule: { kind: "jsx_attribute" } }).length;
+}
+
+const LOADING_STRIP_SENTINEL = "next/dynamic loading UI stripped (R4c)";
+
 function rewriteDynamic(rootNode: SgNode<TSX>, alias: string): Edit[] | "skip" {
+  const source = rootNode.text();
   const calls = rootNode.findAll({
     rule: {
       kind: "call_expression",
@@ -66,6 +138,8 @@ function rewriteDynamic(rootNode: SgNode<TSX>, alias: string): Edit[] | "skip" {
   if (calls.length === 0) return [];
 
   const callEdits: Edit[] = [];
+  let strippedLoadingUi = false;
+
   for (const call of calls) {
     const args = extractCallArgs(call);
     if (args.length === 0 || args.length > 2) return "skip";
@@ -74,21 +148,58 @@ function rewriteDynamic(rootNode: SgNode<TSX>, alias: string): Edit[] | "skip" {
     if (!isSimpleImportArrow(loader)) return "skip";
     if (args.length === 2) {
       const opt = args[1];
-      if (!opt || !isSafeDynamicOptionsNode(opt)) return "skip";
+      if (!opt || !canConvertDynamicOptionsToLazy(opt)) return "skip";
+      if (objectOptionHasLoadingKey(opt)) strippedLoadingUi = true;
     }
-    const fnNode = call.field("function");
-    if (!fnNode) return "skip";
-    callEdits.push(fnNode.replace("lazy"));
+    callEdits.push(call.replace(`lazy(${loader.text()})`));
   }
 
   if (callEdits.length === 0) return [];
 
   const importEdits: Edit[] = [];
+  if (strippedLoadingUi && !source.includes(LOADING_STRIP_SENTINEL)) {
+    importEdits.push({
+      startPos: 0,
+      endPos: 0,
+      insertedText: `${TODO_PREFIX}${LOADING_STRIP_SENTINEL}: restore loading UX with \`<Suspense fallback={…}>\` — https://react.dev/reference/react/Suspense\n`,
+    });
+  }
   const rm = removeImport(rootNode, { type: "default", from: NEXT_DYNAMIC });
   if (rm) importEdits.push(rm);
   importEdits.push(...ensureLazyReactImport(rootNode));
 
   return [...importEdits, ...callEdits];
+}
+
+function objectOptionHasLoadingKey(node: SgNode<TSX>): boolean {
+  if (!node.is("object")) return false;
+  for (const pair of node.findAll({ rule: { kind: "pair" } })) {
+    const parent = pair.parent();
+    if (!parent || parent.id() !== node.id()) continue;
+    const keyNode = pair.field("key");
+    const key =
+      keyNode?.kind() === "property_identifier"
+        ? keyNode.text()
+        : (keyNode?.text().replace(/['"]/g, "").trim() ?? "");
+    if (key === "loading") return true;
+  }
+  return false;
+}
+
+function canConvertDynamicOptionsToLazy(node: SgNode<TSX>): boolean {
+  if (isSafeDynamicOptionsNode(node)) return true;
+  if (!node.is("object")) return false;
+  for (const pair of node.findAll({ rule: { kind: "pair" } })) {
+    const parent = pair.parent();
+    if (!parent || parent.id() !== node.id()) continue;
+    const keyNode = pair.field("key");
+    const key =
+      keyNode?.kind() === "property_identifier"
+        ? keyNode.text()
+        : (keyNode?.text().replace(/['"]/g, "").trim() ?? "");
+    if (key !== "ssr" && key !== "loading") return false;
+  }
+  return true;
 }
 
 function extractCallArgs(call: SgNode<TSX>): SgNode<TSX>[] {

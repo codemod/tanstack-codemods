@@ -4,7 +4,7 @@
  * - Drops those names from `next/server` imports; keeps the rest (`userAgent`, `after`, …).
  *
  * **Skips the file** when:
- * - `NextResponse.next` / `NextResponse.rewrite` (middleware-only),
+ * - `NextResponse.next` (middleware-only),
  * - `NextRequest as …` / `NextResponse as …` (aliases need manual mapping),
  * - `import * as … from "next/server"`.
  *
@@ -20,7 +20,6 @@ const R4H_SENTINEL = "next/server migration (R4h)";
 
 const UNSUPPORTED = [
   /\bNextResponse\.next\b/,
-  /\bNextResponse\.rewrite\b/,
 ];
 
 const codemod: Codemod<TSX> = async (root) => {
@@ -93,10 +92,35 @@ const codemod: Codemod<TSX> = async (root) => {
       edits.push(id.replace("Response"));
     }
   }
+  for (const call of rootNode.findAll({ rule: { kind: "call_expression" } })) {
+    const fn = call.field("function");
+    if (!fn || fn.kind() !== "member_expression") continue;
+    const obj = fn.field("object");
+    const prop = fn.field("property")?.text();
+    if (obj?.kind() !== "identifier") continue;
+    if (obj.text() !== "NextResponse" && obj.text() !== "Response") continue;
+    if (prop !== "rewrite") continue;
+    const argsText = call.field("arguments")?.text() ?? "";
+    const argExpr = argsText.replace(/^\(\s*/, "").replace(/\s*\)$/, "").trim();
+    if (!argExpr) continue;
+    edits.push(
+      call.replace(`Response.redirect(${argExpr}.toString(), 307)`),
+    );
+  }
 
   if (edits.length === 0) return null;
   edits.sort((a, b) => b.startPos - a.startPos);
-  return rootNode.commitEdits(edits);
+  const out = rootNode.commitEdits(edits);
+  const out2 = out
+    .replace(
+      /\b(?:NextResponse|Response)\.rewrite\(\s*([A-Za-z_$][A-Za-z0-9_$]*)\s*\)/g,
+      "Response.redirect($1.toString(), 307)",
+    )
+    .replace(
+      /\b(?:NextResponse|Response)\.rewrite\(\s*new URL\(([^)]+)\)\s*\)/g,
+      "Response.redirect(new URL($1).toString(), 307)",
+    );
+  return out2;
 };
 
 export default codemod;
@@ -204,3 +228,4 @@ function deleteImportStatement(source: string, stmt: SgNode<TSX>, insertedText: 
   if (source[end] === "\n") end++;
   return { startPos: start, endPos: end, insertedText };
 }
+

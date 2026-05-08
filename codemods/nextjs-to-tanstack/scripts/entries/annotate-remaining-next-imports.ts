@@ -35,7 +35,7 @@ const codemod: Codemod<TSX> = async (root) => {
   const importStmts = rootNode.findAll({ rule: { kind: "import_statement" } });
   const nextImports = importStmts.filter((s) => {
     const from = parseImportSource(s.text());
-    return from != null && from.startsWith("next/");
+    return from != null && (from === "next" || from.startsWith("next/"));
   });
 
   const absFile = getFilename(root);
@@ -161,7 +161,25 @@ function todoForNextSpecifier(from: string): { message: string; docUrl?: string 
       docUrl: "https://tanstack.com/router/latest/docs/framework/react/guide/navigation",
     };
   }
-  if (from === "next/link" || from === "next/image" || from === "next/router") {
+  if (from === "next") {
+    return {
+      message:
+        "remaining `next` root import — value imports (e.g. `createServer`, `Instrumentation`) have no TanStack twin; port boots/server wiring manually; type-only imports should have been erased by R4j",
+      docUrl: "https://tanstack.com/start/latest/docs/framework/react/migrate-from-next-js",
+    };
+  }
+  if (from.startsWith("next/dist")) {
+    return {
+      message: `internal \`${from}\` was not fully auto-ported — avoid Next internals; use Web APIs, small local shims, or peer deps`,
+      docUrl: "https://tanstack.com/start/latest/docs/framework/react/migrate-from-next-js",
+    };
+  }
+  if (
+    from === "next/link" ||
+    from === "next/image" ||
+    from === "next/router" ||
+    from === "next/compat/router"
+  ) {
     return {
       message: `this \`${from}\` import survived the codemod — port to @tanstack/react-router or unpic manually`,
       docUrl: "https://tanstack.com/router/latest/docs/framework/react/routing/routing-concepts",

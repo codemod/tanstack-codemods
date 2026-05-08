@@ -33,6 +33,8 @@ const codemod: Codemod<TSX> = async (root) => {
   const rootNode = root.root();
   const edits: Edit[] = [];
 
+  edits.push(...rewriteNextLinkTypeOnlyImports(rootNode));
+
   const linkImport = getImport(rootNode, { type: "default", from: NEXT_LINK });
   if (linkImport && !linkImport.isNamespace) {
     const linkEdits = rewriteLink(rootNode, linkImport.alias);
@@ -49,6 +51,35 @@ const codemod: Codemod<TSX> = async (root) => {
 };
 
 export default codemod;
+
+/**
+ * `import type { LinkProps } from "next/link"` and inline `type` specifiers —
+ * Next types are replaced with `@tanstack/react-router` (see Link props docs).
+ */
+function rewriteNextLinkTypeOnlyImports(rootNode: SgNode<TSX>): Edit[] {
+  const edits: Edit[] = [];
+  for (const stmt of rootNode.findAll({ rule: { kind: "import_statement" } })) {
+    const t = stmt.text();
+    if (!/from\s*["']next\/link["']/.test(t)) continue;
+    if (!isNextLinkTypeOnlyImportStatement(t)) continue;
+    const next = t.replace(
+      /from\s*["']next\/link["']/,
+      `from "${TANSTACK_ROUTER}"`,
+    );
+    if (next === t) continue;
+    edits.push({
+      startPos: stmt.range().start.index,
+      endPos: stmt.range().end.index,
+      insertedText: next,
+    });
+  }
+  return edits;
+}
+
+function isNextLinkTypeOnlyImportStatement(text: string): boolean {
+  if (/^\s*import\s+type\b/m.test(text)) return true;
+  return /\{\s*type\s+[^}]+[^}]*\}/.test(text);
+}
 
 function rewriteLink(rootNode: SgNode<TSX>, alias: string): Edit[] {
   const edits: Edit[] = [];

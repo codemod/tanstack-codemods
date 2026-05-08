@@ -1,8 +1,7 @@
-import dynamic from "next/dynamic";
+// TODO: next/dynamic loading UI stripped (R4c): restore loading UX with `<Suspense fallback={…}>` — https://react.dev/reference/react/Suspense
+import { lazy } from 'react';
 
-const Other = dynamic(() => import("./other"), {
-  loading: () => <p>wait</p>,
-});
+const Other = lazy(() => import("./other"));
 
 export function Page() {
   return <Other />;

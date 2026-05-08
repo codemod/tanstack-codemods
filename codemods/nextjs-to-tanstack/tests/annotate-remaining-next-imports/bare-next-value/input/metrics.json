@@ -1,0 +1,10 @@
+{
+  "nextjs-to-tanstack-r10b-next-import": [
+    {
+      "cardinality": {
+        "module": "next"
+      },
+      "count": 1
+    }
+  ]
+}

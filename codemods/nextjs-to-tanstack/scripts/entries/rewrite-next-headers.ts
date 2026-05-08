@@ -1,36 +1,47 @@
 /**
- * Best-effort migration of `next/headers` named exports `cookies` and `headers`:
- * - `cookies().get(name)` / `(await cookies()).get(name)` → `getCookieFromRequest(undefined, name)`
- * - optional `.value` on the cookie object → `…?.value`
- * - `headers().get(name)` / `(await headers()).get(name)` → `readRequestHeader(undefined, name)`
+ * Best-effort migration of `next/headers` `cookies` and `headers`:
+ * - `cookies().get(name)` / `(await cookies()).get(name)` → `getCookie(name)` (+ optional `.value` strip)
+ * - `cookies().set(name, value, opts?)` → `setCookie(name, value, opts?)`
+ * - `cookies().delete(name)` → `deleteCookie(name)`
+ * - `cookies().has(name)` → `Boolean(getCookie(name))`
+ * - `cookies().getAll()` → `Object.entries(getCookies()).map(([name, value]) => ({ name, value }))`
+ * - `headers().get(name)` / `(await headers()).get(name)` → `getHeaders()[name]`
  *
- * A leading `// TODO: … (R4f)` banner is inserted once (unless already present). Pass a real
- * `Request` from TanStack Router / Start instead of `undefined`.
+ * A leading `// TODO: … (R4f)` banner is inserted once (unless already present). Helpers come from
+ * `@tanstack/start/server` — loaders, `createServerFn`, server routes only.
  *
- * `draftMode` and other exports stay on a reduced `next/headers` import. Files with naked
- * `cookies()` / `headers()` (not chained to `.get`) are skipped.
+ * Bare factories (e.g. `buildLegacyCtx(await headers(), await cookies(), …)`) become Start-compatible
+ * values: `new Headers(…)` from `getHeaders()` and a `{ getAll() {…} }` shim from `getCookies()`.
+ *
+ * `draftMode` and other exports stay on a reduced `next/headers` import. If a `cookies()` / `headers()`
+ * call is **not** supported above or bare as defined here (e.g. stored then used for other methods), the file is skipped.
  */
 
 import type { Codemod, Edit, SgNode } from "codemod:ast-grep";
 import type TSX from "codemod:ast-grep/langs/tsx";
-import { dirname, join, relative } from "path";
-import { inferCodemodTargetDir, normalizePath } from "../utils/paths.ts";
-import { hasSrcAppOrPages } from "../utils/has-src-app-or-pages.ts";
 import { TODO_PREFIX } from "../utils/sentinels.ts";
 
 const NEXT_HEADERS = "next/headers";
+const START_SERVER = "@tanstack/start/server";
 
 const R4F_SENTINEL = "next/headers migration (R4f)";
 
+const COOKIE_STORE_METHODS = new Set(["get", "set", "delete", "has", "getAll"]);
+const HEADER_STORE_METHODS = new Set(["get"]);
+
 type Builtin = "cookies" | "headers" | "draftMode";
+
+type Needs = {
+  getCookie: boolean;
+  getHeaders: boolean;
+  setCookie: boolean;
+  deleteCookie: boolean;
+  getCookies: boolean;
+};
 
 const codemod: Codemod<TSX> = async (root) => {
   const rootNode = root.root();
   const source = rootNode.text();
-
-  const fileAbs = normalizePath(root.filename());
-  const pkgRoot = inferCodemodTargetDir(fileAbs);
-  const bridgeSpec = bridgeSpecifierForFile(pkgRoot, fileAbs);
 
   const hdrImports = rootNode
     .findAll({ rule: { kind: "import_statement" } })
@@ -44,34 +55,27 @@ const codemod: Codemod<TSX> = async (root) => {
 
   if (!cookiesNm && !headersNm) return null;
 
-  if (cookiesNm && nakedFactoryCalls(rootNode, cookiesNm)) return null;
-  if (headersNm && nakedFactoryCalls(rootNode, headersNm)) return null;
+  if (cookiesNm && unsupportedCookiesFactories(rootNode, cookiesNm)) return null;
+  if (headersNm && unsupportedHeadersFactories(rootNode, headersNm)) return null;
 
-  let needCookie = false;
-  let needHeader = false;
-  for (const outer of rootNode.findAll({ rule: { kind: "call_expression" } })) {
-    const fn = outer.field("function");
-    if (!fn || fn.kind() !== "member_expression") continue;
-    if (fn.field("property")?.text() !== "get") continue;
-    const obj = fn.field("object");
-    if (!obj) continue;
-    const factoryBase = unwrapAwaitParens(obj);
-    if (!factoryBase || factoryBase.kind() !== "call_expression") continue;
-    const callee = factoryBase.field("function");
-    if (!callee || callee.kind() !== "identifier") continue;
-    const fac = callee.text();
-    if ((fac !== cookiesNm && fac !== headersNm) || !firstArg(outer.field("arguments"))) continue;
-    if (fac === cookiesNm) needCookie = true;
-    if (fac === headersNm) needHeader = true;
+  const cookieBindingsNeedValueStrip = cookiesNm ? cookieGetBindingNames(rootNode, cookiesNm) : new Set<string>();
+
+  const needs = scanNeeds(rootNode, cookiesNm, headersNm);
+  if (
+    !needs.getCookie &&
+    !needs.getHeaders &&
+    !needs.setCookie &&
+    !needs.deleteCookie &&
+    !needs.getCookies
+  ) {
+    return null;
   }
-
-  if (!needCookie && !needHeader) return null;
 
   const take = todoBannerTake(source);
   const edits: Edit[] = [];
 
   for (const stmt of hdrImports) {
-    const plan = buildImportRewrite(stmt.text(), locals, needCookie, needHeader, bridgeSpec);
+    const plan = buildImportRewrite(stmt.text(), locals, needs);
     if (plan === null) continue;
     const nl = /\r?\n$/.exec(stmt.text())?.[0] ?? "\n";
 
@@ -82,42 +86,117 @@ const codemod: Codemod<TSX> = async (root) => {
   for (const outer of rootNode.findAll({ rule: { kind: "call_expression" } })) {
     const fn = outer.field("function");
     if (!fn || fn.kind() !== "member_expression") continue;
-    if (fn.field("property")?.text() !== "get") continue;
-
+    const prop = fn.field("property")?.text();
+    if (!prop) continue;
     const obj = fn.field("object");
     if (!obj) continue;
-    const factoryBase = unwrapAwaitParens(obj);
-    if (!factoryBase || factoryBase.kind() !== "call_expression") continue;
 
-    const callee = factoryBase.field("function");
-    if (!callee || callee.kind() !== "identifier") continue;
-    const fac = callee.text();
+    const cookiesRoot = unwrapToCookiesFactory(obj, cookiesNm);
+    if (cookiesRoot) {
+      if (!COOKIE_STORE_METHODS.has(prop)) continue;
 
-    const a0 = firstArg(outer.field("arguments"));
-    if (!a0) continue;
-    const a0t = a0.text();
-
-    if (fac === cookiesNm) {
-      let target: SgNode<TSX> = outer;
-      let withValue = false;
-      const up = outer.parent();
-      if (
-        up?.kind() === "member_expression" &&
-        up.field("property")?.text() === "value" &&
-        up.field("object")?.id() === outer.id()
-      ) {
-        target = up;
-        withValue = true;
+      if (prop === "get") {
+        const a0 = firstArg(outer.field("arguments"));
+        if (!a0) continue;
+        const a0t = a0.text();
+        let target: SgNode<TSX> = outer;
+        const up = outer.parent();
+        if (
+          up?.kind() === "member_expression" &&
+          up.field("property")?.text() === "value" &&
+          up.field("object")?.id() === outer.id()
+        ) {
+          target = up;
+        }
+        edits.push(target.replace(`${take()}getCookie(${a0t})`));
+        continue;
       }
 
-      const mid = `getCookieFromRequest(undefined, ${a0t})`;
-      const repl = withValue ? `${mid}?.value` : mid;
-      edits.push(target.replace(`${take()}${repl}`));
-      continue;
+      if (prop === "set") {
+        const args = listArgs(outer.field("arguments"));
+        if (args.length < 2) continue;
+        const inner = args.map((n) => n.text()).join(", ");
+        edits.push(outer.replace(`${take()}setCookie(${inner})`));
+        continue;
+      }
+
+      if (prop === "delete") {
+        const a0 = firstArg(outer.field("arguments"));
+        if (!a0) continue;
+        edits.push(outer.replace(`${take()}deleteCookie(${a0.text()})`));
+        continue;
+      }
+
+      if (prop === "has") {
+        const a0 = firstArg(outer.field("arguments"));
+        if (!a0) continue;
+        edits.push(outer.replace(`${take()}Boolean(getCookie(${a0.text()}))`));
+        continue;
+      }
+
+      if (prop === "getAll") {
+        edits.push(
+          outer.replace(
+            `${take()}Object.entries(getCookies()).map(([name, value]) => ({ name, value }))`,
+          ),
+        );
+        continue;
+      }
     }
 
-    if (fac === headersNm) {
-      edits.push(outer.replace(`${take()}readRequestHeader(undefined, ${a0t})`));
+    const headersRoot = unwrapToHeadersFactory(obj, headersNm);
+    if (headersRoot && prop === "get") {
+      const a0 = firstArg(outer.field("arguments"));
+      if (!a0) continue;
+      edits.push(outer.replace(`${take()}getHeaders()[${a0.text()}]`));
+    }
+  }
+
+  if (cookiesNm) {
+    for (const c of rootNode.findAll({
+      rule: {
+        kind: "call_expression",
+        has: { field: "function", kind: "identifier", regex: `^${escapeRx(cookiesNm)}$` },
+      },
+    })) {
+      if (!isZeroArgCall(c)) continue;
+      if (isSupportedCookieFactoryRoot(c)) continue;
+      if (!isBareHeadersCookiesFactory(c)) continue;
+      const tgt = bareReplacementTarget(c);
+      edits.push(
+        tgt.replace(
+          `${take()}{ getAll: () => Object.entries(getCookies()).map(([name, value]) => ({ name, value: String(value ?? "") })) }`,
+        ),
+      );
+    }
+  }
+
+  if (headersNm) {
+    for (const h of rootNode.findAll({
+      rule: {
+        kind: "call_expression",
+        has: { field: "function", kind: "identifier", regex: `^${escapeRx(headersNm)}$` },
+      },
+    })) {
+      if (!isZeroArgCall(h)) continue;
+      if (isSupportedHeadersFactoryRoot(h)) continue;
+      if (!isBareHeadersCookiesFactory(h)) continue;
+      const tgt = bareReplacementTarget(h);
+      edits.push(
+        tgt.replace(
+          `${take()}new Headers(Object.entries(getHeaders()).map(([k, v]) => [k, Array.isArray(v) ? v.join(", ") : String(v ?? "")] as [string, string]))`,
+        ),
+      );
+    }
+  }
+
+  if (cookieBindingsNeedValueStrip.size > 0) {
+    for (const mem of rootNode.findAll({ rule: { kind: "member_expression" } })) {
+      if (mem.field("property")?.text() !== "value") continue;
+      const o = mem.field("object");
+      if (!o || o.kind() !== "identifier") continue;
+      if (!cookieBindingsNeedValueStrip.has(o.text())) continue;
+      edits.push(mem.replace(`${take()}${o.text()}`));
     }
   }
 
@@ -129,12 +208,253 @@ const codemod: Codemod<TSX> = async (root) => {
 
 export default codemod;
 
+function scanNeeds(
+  rootNode: SgNode<TSX>,
+  cookiesNm: string | undefined,
+  headersNm: string | undefined,
+): Needs {
+  const needs: Needs = {
+    getCookie: false,
+    getHeaders: false,
+    setCookie: false,
+    deleteCookie: false,
+    getCookies: false,
+  };
+
+  for (const outer of rootNode.findAll({ rule: { kind: "call_expression" } })) {
+    const fn = outer.field("function");
+    if (!fn || fn.kind() !== "member_expression") continue;
+    const prop = fn.field("property")?.text();
+    if (!prop) continue;
+    const obj = fn.field("object");
+    if (!obj) continue;
+
+    if (cookiesNm && unwrapToCookiesFactory(obj, cookiesNm)) {
+      if (prop === "get" && firstArg(outer.field("arguments"))) needs.getCookie = true;
+      if (prop === "set") needs.setCookie = true;
+      if (prop === "delete") needs.deleteCookie = true;
+      if (prop === "has") needs.getCookie = true;
+      if (prop === "getAll") needs.getCookies = true;
+    }
+
+    if (headersNm && unwrapToHeadersFactory(obj, headersNm) && prop === "get") {
+      if (firstArg(outer.field("arguments"))) needs.getHeaders = true;
+    }
+  }
+
+  if (cookiesNm) {
+    for (const c of rootNode.findAll({
+      rule: {
+        kind: "call_expression",
+        has: { field: "function", kind: "identifier", regex: `^${escapeRx(cookiesNm)}$` },
+      },
+    })) {
+      if (!isZeroArgCall(c)) continue;
+      if (isSupportedCookieFactoryRoot(c)) continue;
+      if (isBareHeadersCookiesFactory(c)) needs.getCookies = true;
+    }
+  }
+
+  if (headersNm) {
+    for (const h of rootNode.findAll({
+      rule: {
+        kind: "call_expression",
+        has: { field: "function", kind: "identifier", regex: `^${escapeRx(headersNm)}$` },
+      },
+    })) {
+      if (!isZeroArgCall(h)) continue;
+      if (isSupportedHeadersFactoryRoot(h)) continue;
+      if (isBareHeadersCookiesFactory(h)) needs.getHeaders = true;
+    }
+  }
+
+  return needs;
+}
+
+function unsupportedCookiesFactories(root: SgNode<TSX>, cookiesNm: string): boolean {
+  for (const c of root.findAll({
+    rule: {
+      kind: "call_expression",
+      has: { field: "function", kind: "identifier", regex: `^${escapeRx(cookiesNm)}$` },
+    },
+  })) {
+    if (!isZeroArgCall(c)) return true;
+    if (isSupportedCookieFactoryRoot(c)) continue;
+    if (isBareHeadersCookiesFactory(c)) continue;
+    return true;
+  }
+  return false;
+}
+
+function unsupportedHeadersFactories(root: SgNode<TSX>, headersNm: string): boolean {
+  for (const h of root.findAll({
+    rule: {
+      kind: "call_expression",
+      has: { field: "function", kind: "identifier", regex: `^${escapeRx(headersNm)}$` },
+    },
+  })) {
+    if (!isZeroArgCall(h)) return true;
+    if (isSupportedHeadersFactoryRoot(h)) continue;
+    if (isBareHeadersCookiesFactory(h)) continue;
+    return true;
+  }
+  return false;
+}
+
+function isSupportedCookieFactoryRoot(factoryCall: SgNode<TSX>): boolean {
+  let cur: SgNode<TSX> = factoryCall;
+  for (;;) {
+    const p: SgNode<TSX> | null = cur.parent();
+    if (!p) return false;
+    if (p.kind() === "await_expression" || p.kind() === "parenthesized_expression") {
+      cur = p;
+      continue;
+    }
+    if (
+      p.kind() === "member_expression" &&
+      p.field("object")?.id() === cur.id() &&
+      COOKIE_STORE_METHODS.has(p.field("property")?.text() ?? "")
+    ) {
+      const gp = p.parent();
+      return Boolean(
+        gp?.kind() === "call_expression" && gp.field("function")?.id() === p.id(),
+      );
+    }
+    return false;
+  }
+}
+
+function isSupportedHeadersFactoryRoot(factoryCall: SgNode<TSX>): boolean {
+  let cur: SgNode<TSX> = factoryCall;
+  for (;;) {
+    const p: SgNode<TSX> | null = cur.parent();
+    if (!p) return false;
+    if (p.kind() === "await_expression" || p.kind() === "parenthesized_expression") {
+      cur = p;
+      continue;
+    }
+    if (
+      p.kind() === "member_expression" &&
+      p.field("object")?.id() === cur.id() &&
+      HEADER_STORE_METHODS.has(p.field("property")?.text() ?? "")
+    ) {
+      const gp = p.parent();
+      return Boolean(
+        gp?.kind() === "call_expression" && gp.field("function")?.id() === p.id(),
+      );
+    }
+    return false;
+  }
+}
+
+/** Passed-through factory (e.g. `buildLegacyCtx(await headers(), …)`) vs chained `.get` / unknown methods. */
+function isBareHeadersCookiesFactory(factoryCall: SgNode<TSX>): boolean {
+  let cur: SgNode<TSX> = factoryCall;
+  for (;;) {
+    const p: SgNode<TSX> | null = cur.parent();
+    if (!p) return true;
+    if (p.kind() === "await_expression" || p.kind() === "parenthesized_expression") {
+      cur = p;
+      continue;
+    }
+    if (p.kind() === "member_expression" && p.field("object")?.id() === cur.id()) {
+      return false;
+    }
+    return true;
+  }
+}
+
+function bareReplacementTarget(factoryCall: SgNode<TSX>): SgNode<TSX> {
+  const p = factoryCall.parent();
+  if (p?.kind() === "await_expression") {
+    const inner = singleNonPunctuationChild(p);
+    if (inner && inner.id() === factoryCall.id()) return p;
+  }
+  return factoryCall;
+}
+
+function unwrapToCookiesFactory(node: SgNode<TSX>, cookiesNm: string | undefined): SgNode<TSX> | null {
+  if (!cookiesNm) return null;
+  let x: SgNode<TSX> | null = node;
+  for (;;) {
+    if (x.kind() === "parenthesized_expression") {
+      x = singleNonPunctuationChild(x);
+      if (!x) return null;
+      continue;
+    }
+    if (x.kind() === "await_expression") {
+      x = singleNonPunctuationChild(x);
+      if (!x) return null;
+      continue;
+    }
+    break;
+  }
+  if (
+    x.kind() === "call_expression" &&
+    x.field("function")?.kind() === "identifier" &&
+    x.field("function")?.text() === cookiesNm &&
+    isZeroArgCall(x)
+  ) {
+    return x;
+  }
+  return null;
+}
+
+function unwrapToHeadersFactory(node: SgNode<TSX>, headersNm: string | undefined): SgNode<TSX> | null {
+  if (!headersNm) return null;
+  let x: SgNode<TSX> | null = node;
+  for (;;) {
+    if (x.kind() === "parenthesized_expression") {
+      x = singleNonPunctuationChild(x);
+      if (!x) return null;
+      continue;
+    }
+    if (x.kind() === "await_expression") {
+      x = singleNonPunctuationChild(x);
+      if (!x) return null;
+      continue;
+    }
+    break;
+  }
+  if (
+    x.kind() === "call_expression" &&
+    x.field("function")?.kind() === "identifier" &&
+    x.field("function")?.text() === headersNm &&
+    isZeroArgCall(x)
+  ) {
+    return x;
+  }
+  return null;
+}
+
+function isZeroArgCall(c: SgNode<TSX>): boolean {
+  const args = c.field("arguments");
+  if (!args) return true;
+  for (const ch of args.children()) {
+    const k = ch.kind();
+    if (k === "(" || k === ")" || k === ",") continue;
+    return false;
+  }
+  return true;
+}
+
+function listArgs(args: SgNode<TSX> | null): SgNode<TSX>[] {
+  const out: SgNode<TSX>[] = [];
+  if (!args) return out;
+  for (const ch of args.children()) {
+    const k = ch.kind();
+    if (k === "(" || k === ")" || k === ",") continue;
+    out.push(ch as SgNode<TSX>);
+  }
+  return out;
+}
+
 function todoBannerTake(source: string): () => string {
   if (source.includes(R4F_SENTINEL)) {
     return (): string => "";
   }
   let used = false;
-  const line = `${TODO_PREFIX}${R4F_SENTINEL}: pass a real Web \`Request\` from TanStack Router / Start (\`createRouter\` context, server route, Nitro) — HTTP-only cookies stay server-side — https://tanstack.com/router/latest/docs/framework/react/guide/router-context\n`;
+  const line = `${TODO_PREFIX}${R4F_SENTINEL}: \`getCookie\` / \`getHeaders\` / \`setCookie\` / \`deleteCookie\` / \`getCookies\` — TanStack Start server context only; \`draftMode\` / other \`next/headers\` usage — https://tanstack.com/start/latest/docs/framework/react/guide/server-functions\n`;
   return (): string => {
     if (used) return "";
     used = true;
@@ -142,39 +462,30 @@ function todoBannerTake(source: string): () => string {
   };
 }
 
-function nakedFactoryCalls(root: SgNode<TSX>, factoryName: string): boolean {
-  const calls = root.findAll({
-    rule: {
-      kind: "call_expression",
-      has: {
-        field: "function",
-        kind: "identifier",
-        regex: `^${escapeRx(factoryName)}$`,
-      },
-    },
-  });
-
-  for (const c of calls) {
-    const p0 = c.parent();
-    if (p0?.kind() === "await_expression") {
-      const p1 = p0.parent();
-      if (
-        p1?.kind() === "member_expression" &&
-        p1.field("property")?.text() === "get" &&
-        p1.field("object")?.id() === p0.id()
-      )
-        continue;
-      return true;
-    }
-    if (
-      p0?.kind() === "member_expression" &&
-      p0.field("property")?.text() === "get" &&
-      p0.field("object")?.id() === c.id()
-    )
-      continue;
-    return true;
+function cookieGetBindingNames(root: SgNode<TSX>, cookiesNm: string): Set<string> {
+  const names = new Set<string>();
+  for (const decl of root.findAll({ rule: { kind: "variable_declarator" } })) {
+    const nameNode = decl.field("name");
+    if (!nameNode || nameNode.kind() !== "identifier") continue;
+    const init = decl.field("value");
+    if (!init) continue;
+    if (!isCookieGetCallExpr(init, cookiesNm)) continue;
+    names.add(nameNode.text());
   }
-  return false;
+  return names;
+}
+
+function isCookieGetCallExpr(n: SgNode<TSX>, cookiesNm: string): boolean {
+  if (n.kind() !== "call_expression") return false;
+  const fn = n.field("function");
+  if (!fn || fn.kind() !== "member_expression") return false;
+  if (fn.field("property")?.text() !== "get") return false;
+  const obj = fn.field("object");
+  if (!obj) return false;
+  const factoryBase = unwrapAwaitParens(obj);
+  if (!factoryBase || factoryBase.kind() !== "call_expression") return false;
+  const callee = factoryBase.field("function");
+  return Boolean(callee?.kind() === "identifier" && callee.text() === cookiesNm);
 }
 
 function escapeRx(s: string): string {
@@ -186,9 +497,7 @@ type ImportRewrite = { kind: "delete" } | { kind: "replace"; text: string };
 function buildImportRewrite(
   stmtText: string,
   locals: Map<string, Builtin>,
-  needCookie: boolean,
-  needHeader: boolean,
-  bridgeSpec: string | null,
+  needs: Needs,
 ): ImportRewrite | null {
   const brace = extractNamedBrace(stmtText);
   if (brace === null) return null;
@@ -205,26 +514,22 @@ function buildImportRewrite(
     kept.push(p.raw);
   }
 
+  const names: string[] = [];
+  if (needs.deleteCookie) names.push("deleteCookie");
+  if (needs.getCookie) names.push("getCookie");
+  if (needs.getCookies) names.push("getCookies");
+  if (needs.getHeaders) names.push("getHeaders");
+  if (needs.setCookie) names.push("setCookie");
+
   const lines: string[] = [];
-  if ((needCookie || needHeader) && bridgeSpec) {
-    const names: string[] = [];
-    if (needCookie) names.push("getCookieFromRequest");
-    if (needHeader) names.push("readRequestHeader");
-    lines.push(`import { ${names.join(", ")} } from "${bridgeSpec}";`);
+  if (names.length > 0) {
+    names.sort();
+    lines.push(`import { ${names.join(", ")} } from "${START_SERVER}";`);
   }
   if (kept.length) lines.push(`import { ${kept.join(", ")} } from "${NEXT_HEADERS}";`);
 
   if (lines.length === 0) return { kind: "delete" };
   return { kind: "replace", text: lines.join("\n") };
-}
-
-function bridgeSpecifierForFile(pkgRoot: string, fileAbs: string): string | null {
-  const useSrc = hasSrcAppOrPages(pkgRoot);
-  const b = join(pkgRoot, useSrc ? join("src", "next-headers-bridge.ts") : "next-headers-bridge.ts");
-  const base = b.replace(/\\/g, "/").replace(/\.ts$/, "");
-  let rel = relative(dirname(fileAbs), base).replace(/\\/g, "/");
-  if (!rel.startsWith(".")) rel = `./${rel}`;
-  return normalizePath(rel);
 }
 
 function parseImportSource(t: string): string | null {
@@ -292,7 +597,6 @@ function unwrapAwaitParens(n: SgNode<TSX>): SgNode<TSX> | null {
   return x;
 }
 
-/** First AST child that is not parentheses or the `await` keyword token. */
 function singleNonPunctuationChild(n: SgNode<TSX>): SgNode<TSX> | null {
   for (const c of n.children()) {
     const k = c.kind();
