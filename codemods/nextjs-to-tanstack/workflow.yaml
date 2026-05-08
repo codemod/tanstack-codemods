@@ -7,6 +7,14 @@
 #
 version: "1"
 
+params:
+  schema:
+    enableAiFollowupFixups:
+      name: "Enable AI Follow-up Fixups"
+      description: "Run AI step for remaining TODOs and TANSTACK_MIGRATION_NEXT_STEPS tasks."
+      type: string
+      default: "true"
+
 x-shared-excludes: &shared-excludes
   - "**/node_modules/**"
   - "**/.next/**"
@@ -560,12 +568,42 @@ nodes:
             - "**/package.json"
           exclude: *shared-excludes
 
+  - id: ai-followup-fixups
+    name: AI follow-up for remaining TODOs and migration guide tasks
+    type: automatic
+    depends_on: [write-migration-guide]
+    steps:
+      - name: Apply safe fixes from TODOs and TANSTACK_MIGRATION_NEXT_STEPS.md
+        if: params.enableAiFollowupFixups == "true"
+        ai:
+          model: "gpt-4o"
+          max_steps: 60
+          prompt: |
+            You are finishing a Next.js -> TanStack Start migration.
+
+            Context:
+            - Deterministic automated migrations have already run.
+            - A migration guide file named TANSTACK_MIGRATION_NEXT_STEPS.md has been generated.
+            - There may be inline TODO comments in code from earlier passes.
+
+            Your tasks:
+            1) Scan the migrated project for remaining migration TODO comments.
+            2) Read TANSTACK_MIGRATION_NEXT_STEPS.md and implement as many listed tasks as possible.
+            3) Prioritize low-risk, mechanical, and behavior-preserving fixes.
+            4) Keep unresolved high-risk or ambiguous items as concise TODO comments.
+
+            Constraints:
+            - Keep edits minimal and deterministic.
+            - Do not invent APIs or remove behavior without a clear replacement.
+            - Preserve existing exports and type intent.
+            - If a task cannot be safely automated, leave a clear TODO at the closest code location.
+
   # ---- Finalisation ----
 
   - id: finalize-cleanup
     name: Remove codemod sidecar state
     type: automatic
-    depends_on: [write-migration-guide]
+    depends_on: [ai-followup-fixups]
     steps:
       - name: Drop .codemod/state.json
         js-ast-grep:
