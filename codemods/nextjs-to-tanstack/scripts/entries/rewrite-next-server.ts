@@ -266,7 +266,7 @@ function buildNextServerImportRewrite(stmtText: string, acc: StripAccumulator): 
       removedNextPrimitive = true;
       continue;
     }
-    if (exported === "userAgent" || exported === "userAgentFromString") {
+    if (exported === "userAgent" || exported === "userAgentFromString" || exported === "UserAgent") {
       uaSpecs.push(t);
       continue;
     }

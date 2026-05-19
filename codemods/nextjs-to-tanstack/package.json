@@ -33,6 +33,7 @@
     "test:rewrite-next-i18next-imports": "codemod jssg test -l tsx --allow-fs ./scripts/entries/rewrite-next-i18next-imports.ts ./tests/rewrite-next-i18next-imports",
     "test:rewrite-next-cache": "codemod jssg test -l tsx --allow-fs ./scripts/entries/rewrite-next-cache.ts ./tests/rewrite-next-cache",
     "test:rewrite-next-headers": "codemod jssg test -l tsx --allow-fs ./scripts/entries/rewrite-next-headers.ts ./tests/rewrite-next-headers",
+    "test:rewrite-next-headers:stored": "codemod jssg test -l tsx --allow-fs ./scripts/entries/rewrite-next-headers.ts ./tests/rewrite-next-headers/stored-cookie-factory",
     "test:rewrite-next-server": "codemod jssg test -l tsx --allow-fs ./scripts/entries/rewrite-next-server.ts ./tests/rewrite-next-server",
     "test:rewrite-next-server-vitest": "codemod jssg test -l tsx --allow-fs ./scripts/entries/rewrite-next-server-vitest.ts ./tests/rewrite-next-server-vitest",
     "test:rewrite-next-og": "codemod jssg test -l tsx --allow-fs ./scripts/entries/rewrite-next-og.ts ./tests/rewrite-next-og",

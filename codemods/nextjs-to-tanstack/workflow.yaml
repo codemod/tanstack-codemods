@@ -289,7 +289,7 @@ nodes:
         js-ast-grep:
           js_file: scripts/entries/rewrite-next-navigation.ts
           language: tsx
-          include: *cross-cutting-tsx
+          include: *cross-cutting-ts
           exclude: *shared-excludes
 
   - id: rewrite-next-dynamic-script

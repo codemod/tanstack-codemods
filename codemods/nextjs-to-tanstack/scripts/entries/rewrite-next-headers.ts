@@ -7,6 +7,9 @@
  * - `cookies().getAll()` → `Object.entries(getCookies()).map(([name, value]) => ({ name, value }))`
  * - `headers().get(name)` / `(await headers()).get(name)` → `getHeaders()[name]`
  *
+ * Stored factory pattern (`const X = await cookies(); X.get(name); X.delete(name)`) is also fully
+ * handled: method calls on the stored variable are converted and the declaration is removed.
+ *
  * A leading `// TODO: … (R4f)` banner is inserted once (unless already present). Helpers come from
  * `@tanstack/start/server` — loaders, `createServerFn`, server routes only.
  *
@@ -60,7 +63,10 @@ const codemod: Codemod<TSX> = async (root) => {
 
   const cookieBindingsNeedValueStrip = cookiesNm ? cookieGetBindingNames(rootNode, cookiesNm) : new Set<string>();
 
-  const needs = scanNeeds(rootNode, cookiesNm, headersNm);
+  // Stored factory vars: `const X = await cookies(); X.get(name); X.delete(name)` etc.
+  const storedCookieVars = cookiesNm ? collectStoredCookiesVarNames(rootNode, cookiesNm) : new Set<string>();
+
+  const needs = scanNeeds(rootNode, cookiesNm, headersNm, storedCookieVars);
   if (
     !needs.getCookie &&
     !needs.getHeaders &&
@@ -152,6 +158,68 @@ const codemod: Codemod<TSX> = async (root) => {
     }
   }
 
+  // Handle stored factory variables: `const X = await cookies(); X.get(name)` etc.
+  for (const varName of storedCookieVars) {
+    for (const outer of rootNode.findAll({ rule: { kind: "call_expression" } })) {
+      const fn = outer.field("function");
+      if (!fn || fn.kind() !== "member_expression") continue;
+      const prop = fn.field("property")?.text();
+      if (!prop || !COOKIE_STORE_METHODS.has(prop)) continue;
+      const obj = fn.field("object");
+      if (!obj || obj.kind() !== "identifier" || obj.text() !== varName) continue;
+
+      if (prop === "get") {
+        const a0 = firstArg(outer.field("arguments"));
+        if (!a0) continue;
+        const a0t = a0.text();
+        let target: SgNode<TSX> = outer;
+        const up = outer.parent();
+        if (
+          up?.kind() === "member_expression" &&
+          up.field("property")?.text() === "value" &&
+          up.field("object")?.id() === outer.id()
+        ) {
+          target = up;
+        }
+        edits.push(target.replace(`${take()}getCookie(${a0t})`));
+      } else if (prop === "set") {
+        const args = listArgs(outer.field("arguments"));
+        if (args.length < 2) continue;
+        edits.push(outer.replace(`${take()}setCookie(${args.map((n) => n.text()).join(", ")})`));
+      } else if (prop === "delete") {
+        const a0 = firstArg(outer.field("arguments"));
+        if (!a0) continue;
+        edits.push(outer.replace(`${take()}deleteCookie(${a0.text()})`));
+      } else if (prop === "has") {
+        const a0 = firstArg(outer.field("arguments"));
+        if (!a0) continue;
+        edits.push(outer.replace(`${take()}Boolean(getCookie(${a0.text()}))`));
+      } else if (prop === "getAll") {
+        edits.push(
+          outer.replace(
+            `${take()}Object.entries(getCookies()).map(([name, value]) => ({ name, value }))`,
+          ),
+        );
+      }
+    }
+
+    // Remove the stored variable declaration now that call sites are inlined.
+    for (const decl of rootNode.findAll({ rule: { kind: "variable_declarator" } })) {
+      const nameNode = decl.field("name");
+      if (!nameNode || nameNode.kind() !== "identifier" || nameNode.text() !== varName) continue;
+      const init = decl.field("value");
+      if (!init) continue;
+      const base = unwrapAwaitParens(init);
+      if (!base || base.kind() !== "call_expression") continue;
+      const callee = base.field("function");
+      if (!callee || callee.kind() !== "identifier" || callee.text() !== cookiesNm) continue;
+      if (!isZeroArgCall(base)) continue;
+      // Walk up to find the enclosing lexical_declaration (const/let/var).
+      const lexicalDecl = findParentLexicalDeclaration(decl);
+      if (lexicalDecl) edits.push(blankStmtFullLine(source, lexicalDecl));
+    }
+  }
+
   if (cookiesNm) {
     for (const c of rootNode.findAll({
       rule: {
@@ -162,6 +230,9 @@ const codemod: Codemod<TSX> = async (root) => {
       if (!isZeroArgCall(c)) continue;
       if (isSupportedCookieFactoryRoot(c)) continue;
       if (!isBareHeadersCookiesFactory(c)) continue;
+      // Skip vars that are handled by the stored-var path above.
+      const storedVarName = getStoredVarNameForFactory(c);
+      if (storedVarName && storedCookieVars.has(storedVarName)) continue;
       const tgt = bareReplacementTarget(c);
       edits.push(
         tgt.replace(
@@ -212,6 +283,7 @@ function scanNeeds(
   rootNode: SgNode<TSX>,
   cookiesNm: string | undefined,
   headersNm: string | undefined,
+  storedCookieVars: Set<string> = new Set(),
 ): Needs {
   const needs: Needs = {
     getCookie: false,
@@ -237,6 +309,15 @@ function scanNeeds(
       if (prop === "getAll") needs.getCookies = true;
     }
 
+    // Stored factory vars: `const X = await cookies(); X.get(name)` etc.
+    if (obj.kind() === "identifier" && storedCookieVars.has(obj.text())) {
+      if (prop === "get" && firstArg(outer.field("arguments"))) needs.getCookie = true;
+      if (prop === "set") needs.setCookie = true;
+      if (prop === "delete") needs.deleteCookie = true;
+      if (prop === "has") needs.getCookie = true;
+      if (prop === "getAll") needs.getCookies = true;
+    }
+
     if (headersNm && unwrapToHeadersFactory(obj, headersNm) && prop === "get") {
       if (firstArg(outer.field("arguments"))) needs.getHeaders = true;
     }
@@ -251,6 +332,9 @@ function scanNeeds(
     })) {
       if (!isZeroArgCall(c)) continue;
       if (isSupportedCookieFactoryRoot(c)) continue;
+      // Skip stored vars — those needs are counted via the identifier loop above.
+      const storedVarName = getStoredVarNameForFactory(c);
+      if (storedVarName && storedCookieVars.has(storedVarName)) continue;
       if (isBareHeadersCookiesFactory(c)) needs.getCookies = true;
     }
   }
@@ -623,4 +707,79 @@ function blankStmt(source: string, stmt: SgNode<TSX>): Edit {
   if (source[end] === "\r") end++;
   if (source[end] === "\n") end++;
   return { startPos: start, endPos: end, insertedText: "" };
+}
+
+/**
+ * Like `blankStmt` but also includes any leading whitespace on the same line, so that
+ * removing a statement doesn't leave behind orphan indentation that merges with the
+ * indentation of the following line (doubling the indent).
+ */
+function blankStmtFullLine(source: string, stmt: SgNode<TSX>): Edit {
+  let start = stmt.range().start.index;
+  // Walk back over leading whitespace on this line (stop at newline or start of source).
+  while (start > 0 && source[start - 1] !== "\n" && source[start - 1] !== "\r" &&
+    (source[start - 1] === " " || source[start - 1] === "\t")) {
+    start--;
+  }
+  let end = stmt.range().end.index;
+  while (end < source.length && (source[end] === " " || source[end] === "\t")) end++;
+  if (end < source.length && source[end] === "\r") end++;
+  if (end < source.length && source[end] === "\n") end++;
+  return { startPos: start, endPos: end, insertedText: "" };
+}
+
+/**
+ * Collect variable names that are assigned directly from `cookies()` or `await cookies()`:
+ *   `const X = cookies()` / `const X = await cookies()`
+ * These are "stored factory" vars where call sites like `X.get(name)` need direct conversion.
+ */
+function collectStoredCookiesVarNames(root: SgNode<TSX>, cookiesNm: string): Set<string> {
+  const out = new Set<string>();
+  for (const decl of root.findAll({ rule: { kind: "variable_declarator" } })) {
+    const nameNode = decl.field("name");
+    if (!nameNode || nameNode.kind() !== "identifier") continue;
+    const init = decl.field("value");
+    if (!init) continue;
+    const base = unwrapAwaitParens(init);
+    if (!base || base.kind() !== "call_expression") continue;
+    const callee = base.field("function");
+    if (!callee || callee.kind() !== "identifier" || callee.text() !== cookiesNm) continue;
+    if (!isZeroArgCall(base)) continue;
+    out.add(nameNode.text());
+  }
+  return out;
+}
+
+/**
+ * If `factoryCall` is `cookies()` / `await cookies()` that is directly assigned to a variable
+ * (i.e., `const X = await cookies()`), return the variable name `X`. Otherwise null.
+ */
+function getStoredVarNameForFactory(factoryCall: SgNode<TSX>): string | null {
+  let cur: SgNode<TSX> = factoryCall;
+  const p = cur.parent();
+  // Walk through optional await wrapper
+  if (p?.kind() === "await_expression") {
+    cur = p;
+  }
+  const gp = cur.parent();
+  if (gp?.kind() === "variable_declarator") {
+    const name = gp.field("name");
+    if (name?.kind() === "identifier") return name.text();
+  }
+  return null;
+}
+
+/**
+ * Walk up the AST from a `variable_declarator` to find the enclosing `lexical_declaration`
+ * (i.e., the full `const X = …` / `let X = …` statement).
+ */
+function findParentLexicalDeclaration(decl: SgNode<TSX>): SgNode<TSX> | null {
+  let cur: SgNode<TSX> | null = decl.parent();
+  while (cur) {
+    if (cur.kind() === "lexical_declaration" || cur.kind() === "variable_declaration") {
+      return cur;
+    }
+    cur = cur.parent();
+  }
+  return null;
 }

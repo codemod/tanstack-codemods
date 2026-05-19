@@ -294,19 +294,18 @@ function rewriteScript(rootNode: SgNode<TSX>, alias: string): Edit[] | "skip" {
     if (!openEl) continue;
 
     const srcAttr = findAttrOnOpening(openEl, "src");
-    if (!srcAttr) return "skip";
 
     if (onReadyAttr(openEl)) return "skip";
 
     const strat = findAttrOnOpening(openEl, "strategy");
-    let useDefer = true;
+    let useDefer = !!srcAttr; // only add defer for external scripts
     let useAsync = false;
     if (strat) {
       const raw = attrValueNode(strat)?.text() ?? strat.text();
       const v = raw.replace(/^=\s*/, "").replace(/["']/g, "").trim();
       if (/beforeInteractive|^worker$/i.test(v)) return "skip";
       if (v === "lazyOnload") {
-        useAsync = true;
+        useAsync = !!srcAttr;
         useDefer = false;
       }
     }
@@ -356,8 +355,8 @@ function scriptUsagesAreAllSafe(rootNode: SgNode<TSX>, alias: string): boolean {
   for (const opening of findJsxScriptOpens(rootNode, alias)) {
     const openEl = jsxOpeningFromSubject(outerJsxReplacementTarget(opening));
     if (!openEl) return false;
-    if (!findAttrOnOpening(openEl, "src")) return false;
     if (onReadyAttr(openEl)) return false;
+    const hasSrc = !!findAttrOnOpening(openEl, "src");
     const strat = findAttrOnOpening(openEl, "strategy");
     if (strat) {
       const raw = attrValueNode(strat)?.text() ?? strat.text();
@@ -365,6 +364,11 @@ function scriptUsagesAreAllSafe(rootNode: SgNode<TSX>, alias: string): boolean {
       if (/beforeInteractive|^worker$/i.test(v)) return false;
     }
     const outer = outerJsxReplacementTarget(opening);
+    // External script must have src; inline script (<Script>{...}</Script>) is safe
+    // as long as children are only JSX expressions, not raw text content.
+    if (!hasSrc) {
+      if (outer.kind() === "jsx_self_closing_element") return false; // self-closing without src → skip
+    }
     if (outer.kind() === "jsx_element") {
       for (const ch of outer.children()) {
         if (ch.kind() === "jsx_text" && /\S/.test(ch.text())) return false;
