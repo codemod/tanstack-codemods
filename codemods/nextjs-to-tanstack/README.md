@@ -10,13 +10,13 @@ The workflow rewrites routes and handlers, updates tooling, and writes `TANSTACK
 
 ```bash
 # Registry
-npx codemod@latest run nextjs-to-tanstack
+npx codemod run nextjs-to-tanstack
 
 # Monorepo: point at the Next.js package root
-npx codemod@latest run nextjs-to-tanstack -t /path/to/next-app
+npx codemod run nextjs-to-tanstack -t /path/to/next-app
 
 # This repo: run the bundled workflow
-npx codemod@latest workflow run --workflow workflow.yaml --target .
+npx codemod workflow run --workflow workflow.yaml --target .
 ```
 
 Back up or commit first (recommended). Many files change; unmigrated `pages/` files may end up under `migrated-from-pages/`.
@@ -36,7 +36,7 @@ Pass these when running [`workflow.yaml`](workflow.yaml) with `-p`:
 **`enableAiFollowupFixups`** — If `"true"`, an AI pass tries to clear low-risk `// TODO:` markers and tasks in `TANSTACK_MIGRATION_NEXT_STEPS.md`. Output is not fully deterministic; turn on only if you want that extra step.
 
 ```bash
-npx codemod@latest workflow run --workflow workflow.yaml --target . \
+npx codemod workflow run --workflow workflow.yaml --target . \
   -p enableAiFollowupFixups=true
 ```
 
