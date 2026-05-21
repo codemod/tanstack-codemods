@@ -7,23 +7,26 @@
  * to the (now absent) file.
  */
 
-import type { Codemod } from "codemod:ast-grep";
-import type TSX from "codemod:ast-grep/langs/tsx";
-import { getFilename } from "../utils/paths.ts";
-import { safeRemoveFile } from "../utils/safe-remove.ts";
+import type { Codemod } from 'codemod:ast-grep'
+import type TSX from 'codemod:ast-grep/langs/tsx'
 
-const OBSOLETE = /\/(next|postcss)\.config\.(js|mjs|cjs|ts|mts|cts)$/;
+import { getFilename } from '../utils/paths.ts'
+import { safeRemoveFile } from '../utils/safe-remove.ts'
+
+const OBSOLETE = /\/(next|postcss)\.config\.(js|mjs|cjs|ts|mts|cts)$/
 
 const codemod: Codemod<TSX> = async (root) => {
-  const file = getFilename(root);
-  if (!OBSOLETE.test(file)) return null;
+  const file = getFilename(root)
+  if (!OBSOLETE.test(file)) {
+    return null
+  }
 
   try {
-    safeRemoveFile(file);
+    safeRemoveFile(file)
   } catch {
     // Already gone, no-op.
   }
-  return null;
-};
+  return null
+}
 
-export default codemod;
+export default codemod

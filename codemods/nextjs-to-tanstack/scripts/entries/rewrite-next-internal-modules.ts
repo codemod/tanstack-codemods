@@ -10,21 +10,22 @@
  *   - `import type { ImageProps } from "next/image"` → `type ImageProps = React.ImgHTMLAttributes<HTMLImageElement>`
  */
 
-import type { Codemod } from "codemod:ast-grep";
-import type TSX from "codemod:ast-grep/langs/tsx";
-import { TODO_PREFIX } from "../utils/sentinels.ts";
+import type { Codemod } from 'codemod:ast-grep'
+import type TSX from 'codemod:ast-grep/langs/tsx'
 
-const R4DIST_SENTINEL = "next/dist migration (R4dist)";
-const PATH_TO_REGEXP_TODO_NEEDLE = "replaced Next's bundled copy";
+import { TODO_PREFIX } from '../utils/sentinels.ts'
+
+const R4DIST_SENTINEL = 'next/dist migration (R4dist)'
+const PATH_TO_REGEXP_TODO_NEEDLE = "replaced Next's bundled copy"
 
 const codemod: Codemod<TSX> = async (root) => {
-  const rootNode = root.root();
-  const source = rootNode.text();
-  let s = source;
+  const rootNode = root.root()
+  const source = rootNode.text()
+  let s = source
 
-  const hadCompiledPathToRegexp = /next\/dist\/compiled\/path-to-regexp/.test(s);
+  const hadCompiledPathToRegexp = s.includes('next/dist/compiled/path-to-regexp')
 
-  const apiTodo = `${TODO_PREFIX}${R4DIST_SENTINEL}: ApiError shim — align status codes / JSON body with your TanStack Start server routes — https://tanstack.com/start/latest/docs/framework/react/guide/server-routes\n`;
+  const apiTodo = `${TODO_PREFIX}${R4DIST_SENTINEL}: ApiError shim — align status codes / JSON body with your TanStack Start server routes — https://tanstack.com/start/latest/docs/framework/react/guide/server-routes\n`
   s = s.replace(
     /^[ \t]*import\s*\{\s*ApiError\s*\}\s*from\s*["']next\/dist\/server\/api-utils["']\s*;?\s*\r?\n/m,
     `${apiTodo}class ApiError extends Error {
@@ -35,85 +36,78 @@ const codemod: Codemod<TSX> = async (root) => {
     this.statusCode = statusCode;
   }
 }
-`
-  );
+`,
+  )
 
-  s = s.replace(
-    /\brequire\s*\(\s*["']next\/dist\/compiled\/path-to-regexp["']\s*\)/g,
-    `require("path-to-regexp")`
-  );
+  s = s.replaceAll(/\brequire\s*\(\s*["']next\/dist\/compiled\/path-to-regexp["']\s*\)/g, `require("path-to-regexp")`)
 
   if (hadCompiledPathToRegexp && !s.includes(PATH_TO_REGEXP_TODO_NEEDLE)) {
-    const pathTodo = `${TODO_PREFIX}${R4DIST_SENTINEL}: ensure \`path-to-regexp\` is in package.json — replaced Next's bundled copy\n`;
-    s = pathTodo + s;
+    const pathTodo = `${TODO_PREFIX}${R4DIST_SENTINEL}: ensure \`path-to-regexp\` is in package.json — replaced Next's bundled copy\n`
+    s = pathTodo + s
   }
 
-  const codegenTodo = `${TODO_PREFIX}${R4DIST_SENTINEL}: codegen — verify emitted bundle uses React.lazy (not next/dynamic)\n`;
-  s = s.replace(
-    /import dynamic from "next\/dynamic"/g,
-    `${codegenTodo}import { lazy as dynamic } from "react"`
-  );
-  s = s.replace(
-    /import dynamic from 'next\/dynamic'/g,
-    `${codegenTodo}import { lazy as dynamic } from 'react'`
-  );
+  const codegenTodo = `${TODO_PREFIX}${R4DIST_SENTINEL}: codegen — verify emitted bundle uses React.lazy (not next/dynamic)\n`
+  s = s.replaceAll('import dynamic from "next/dynamic"', `${codegenTodo}import { lazy as dynamic } from "react"`)
+  s = s.replaceAll("import dynamic from 'next/dynamic'", `${codegenTodo}import { lazy as dynamic } from 'react'`)
 
-  const headersTypeTodo = `${TODO_PREFIX}${R4DIST_SENTINEL}: \`import("next/headers")\` in types → \`getHeaders\` / \`getCookies\` from @tanstack/start/server — verify \`ReturnType\`\n`;
-  const hadNextHeadersImportType = /\bimport\s*\(\s*["']next\/headers["']\s*\)/.test(s);
-  const beforeHdrType = s;
-  s = s.replace(
+  const headersTypeTodo = `${TODO_PREFIX}${R4DIST_SENTINEL}: \`import("next/headers")\` in types → \`getHeaders\` / \`getCookies\` from @tanstack/start/server — verify \`ReturnType\`\n`
+  const hadNextHeadersImportType = /\bimport\s*\(\s*["']next\/headers["']\s*\)/.test(s)
+  const beforeHdrType = s
+  s = s.replaceAll(
     /\bimport\s*\(\s*["']next\/headers["']\s*\)\s*\.\s*headers\b/g,
-    `import("@tanstack/start/server").getHeaders`
-  );
-  s = s.replace(
+    `import("@tanstack/start/server").getHeaders`,
+  )
+  s = s.replaceAll(
     /\bimport\s*\(\s*["']next\/headers["']\s*\)\s*\.\s*cookies\b/g,
-    `import("@tanstack/start/server").getCookies`
-  );
+    `import("@tanstack/start/server").getCookies`,
+  )
   if (hadNextHeadersImportType && s !== beforeHdrType) {
-    s = headersTypeTodo + s;
+    s = headersTypeTodo + s
   }
 
-  const readonlyNavTodo = `${TODO_PREFIX}${R4DIST_SENTINEL}: \`ReadonlyURLSearchParams\` from next/navigation → local alias; narrow to route search types when possible\n`;
+  const readonlyNavTodo = `${TODO_PREFIX}${R4DIST_SENTINEL}: \`ReadonlyURLSearchParams\` from next/navigation → local alias; narrow to route search types when possible\n`
   if (/\bReadonlyURLSearchParams\b/.test(s) && /from\s*["']next\/navigation["']/.test(s)) {
     s = s.replace(
       /^[ \t]*import\s+type\s*\{\s*ReadonlyURLSearchParams\s*\}\s*from\s*["']next\/navigation["']\s*;?\s*\r?\n/m,
-      `${readonlyNavTodo}type ReadonlyURLSearchParams = URLSearchParams;\n`
-    );
+      `${readonlyNavTodo}type ReadonlyURLSearchParams = URLSearchParams;\n`,
+    )
   }
 
-  const imageTodo = `${TODO_PREFIX}${R4DIST_SENTINEL}: next/image helper shim — verify responsive/srcSet behavior where \`getImageProps\` was used\n`;
-  const hadImageImport = /from\s*["']next\/image["']/.test(s);
+  const imageTodo = `${TODO_PREFIX}${R4DIST_SENTINEL}: next/image helper shim — verify responsive/srcSet behavior where \`getImageProps\` was used\n`
+  const hadImageImport = /from\s*["']next\/image["']/.test(s)
   s = s.replace(
     /^[ \t]*import\s*\{\s*getImageProps\s*\}\s*from\s*["']next\/image["']\s*;?\s*\r?\n/m,
-    `${imageTodo}function getImageProps<T extends Record<string, unknown>>(input: T): { props: T } {\n  return { props: input };\n}\n`
-  );
+    `${imageTodo}function getImageProps<T extends Record<string, unknown>>(input: T): { props: T } {\n  return { props: input };\n}\n`,
+  )
   s = s.replace(
     /^[ \t]*import\s+type\s*\{\s*ImageProps\s*\}\s*from\s*["']next\/image["']\s*;?\s*\r?\n/m,
-    `${imageTodo}type ImageProps = React.ImgHTMLAttributes<HTMLImageElement>;\n`
-  );
+    `${imageTodo}type ImageProps = React.ImgHTMLAttributes<HTMLImageElement>;\n`,
+  )
   if (hadImageImport) {
     s = s.replace(
       /^[ \t]*import\s+type\s*\{\s*ImageProps\s*\}\s*,\s*\{\s*getImageProps\s*\}\s*from\s*["']next\/image["']\s*;?\s*\r?\n/m,
-      `${imageTodo}type ImageProps = React.ImgHTMLAttributes<HTMLImageElement>;\nfunction getImageProps<T extends Record<string, unknown>>(input: T): { props: T } {\n  return { props: input };\n}\n`
-    );
+      `${imageTodo}type ImageProps = React.ImgHTMLAttributes<HTMLImageElement>;\nfunction getImageProps<T extends Record<string, unknown>>(input: T): { props: T } {\n  return { props: input };\n}\n`,
+    )
   }
 
-  const nextErrorTodo = `${TODO_PREFIX}${R4DIST_SENTINEL}: \`next/error\` was replaced with a local fallback component; customize your global error UI\n`;
-  const hadNextError = /from\s*["']next\/error["']/.test(s);
+  const nextErrorTodo = `${TODO_PREFIX}${R4DIST_SENTINEL}: \`next/error\` was replaced with a local fallback component; customize your global error UI\n`
+  const hadNextError = /from\s*["']next\/error["']/.test(s)
   s = s.replace(
     /^[ \t]*import\s+([A-Za-z_$][A-Za-z0-9_$]*)\s+from\s*["']next\/error["']\s*;?\s*\r?\n/m,
-    `${nextErrorTodo}const $1 = ({ statusCode = 500 }: { statusCode?: number }) => (\n  <div role="alert">Unexpected error</div>\n);\n`
-  );
+    `${nextErrorTodo}const $1 = ({ statusCode = 500 }: { statusCode?: number }) => (\n  <div role="alert">Unexpected error</div>\n);\n`,
+  )
   if (hadNextError) {
-    s = s.replace(
+    s = s.replaceAll(
       /\b<([A-Za-z_$][A-Za-z0-9_$]*)\s+statusCode=\{0\}\s*\/>/g,
-      '<div role="alert">Unexpected error</div>'
-    );
+      '<div role="alert">Unexpected error</div>',
+    )
   }
 
-  if (s === source) return null;
-  const r = rootNode.range();
-  return rootNode.commitEdits([{ startPos: r.start.index, endPos: r.end.index, insertedText: s }]);
-};
+  if (s === source) {
+    return null
+  }
+  const r = rootNode.range()
+  return rootNode.commitEdits([{ startPos: r.start.index, endPos: r.end.index, insertedText: s }])
+}
 
-export default codemod;
+export default codemod

@@ -5,26 +5,28 @@
  * Does not delete `.codemod/i18n.json` (optional-locale migration metadata).
  */
 
-import type { Codemod } from "codemod:ast-grep";
-import type JSON_TYPES from "codemod:ast-grep/langs/json";
-import { dirname, join } from "path";
-import { getFilename } from "../utils/paths.ts";
-import { safeRemoveFile } from "../utils/safe-remove.ts";
+import { dirname, join } from 'node:path'
+
+import type { Codemod } from 'codemod:ast-grep'
+import type JSON_TYPES from 'codemod:ast-grep/langs/json'
+
+import { getFilename } from '../utils/paths.ts'
+import { safeRemoveFile } from '../utils/safe-remove.ts'
 
 const codemod: Codemod<JSON_TYPES> = async (root) => {
-  const file = getFilename(root);
-  if (!file.endsWith("/package.json") && !file.endsWith("package.json")) {
-    return null;
+  const file = getFilename(root)
+  if (!file.endsWith('/package.json') && !file.endsWith('package.json')) {
+    return null
   }
 
-  const repoRoot = dirname(file);
-  const stateDir = join(repoRoot, ".codemod");
+  const repoRoot = dirname(file)
+  const stateDir = join(repoRoot, '.codemod')
   try {
-    safeRemoveFile(join(stateDir, "state.json"));
+    safeRemoveFile(join(stateDir, 'state.json'))
   } catch {
     // Already absent — fine.
   }
-  return null;
-};
+  return null
+}
 
-export default codemod;
+export default codemod

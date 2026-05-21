@@ -9,34 +9,34 @@
  * to it (e.g. `apps/web/TANSTACK_MIGRATION_NEXT_STEPS.md` in a monorepo).
  */
 
-import type { Codemod } from "codemod:ast-grep";
-import type JSON_TYPES from "codemod:ast-grep/langs/json";
-import { getState } from "codemod:workflow";
-import { useMetricAtom } from "codemod:metrics";
-import { writeFileSync } from "fs";
-import { join } from "path";
-import {
-  buildMigrationRunSummarySection,
-  type R10Accum,
-  type R10bAccum,
-} from "../utils/migration-run-report.ts";
-import { getFilename, normalizePath, relativeToTargetDir } from "../utils/paths.ts";
+import { writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 
-const OUTFILE = "TANSTACK_MIGRATION_NEXT_STEPS.md";
+import type { Codemod } from 'codemod:ast-grep'
+import type JSON_TYPES from 'codemod:ast-grep/langs/json'
+import { useMetricAtom } from 'codemod:metrics'
+import { getState } from 'codemod:workflow'
 
-const r10Metric = useMetricAtom("nextjs-to-tanstack-r10-async-await");
-const r10bMetric = useMetricAtom("nextjs-to-tanstack-r10b-next-import");
+import { buildMigrationRunSummarySection, type R10Accum, type R10bAccum } from '../utils/migration-run-report.ts'
+import { getFilename, normalizePath, relativeToTargetDir } from '../utils/paths.ts'
+
+const OUTFILE = 'TANSTACK_MIGRATION_NEXT_STEPS.md'
+
+const r10Metric = useMetricAtom('nextjs-to-tanstack-r10-async-await')
+const r10bMetric = useMetricAtom('nextjs-to-tanstack-r10b-next-import')
 
 function inferPackageRoot(packageJsonPath: string): string {
-  const idx = packageJsonPath.lastIndexOf("/");
-  if (idx === -1) return ".";
-  return packageJsonPath.slice(0, idx);
+  const idx = packageJsonPath.lastIndexOf('/')
+  if (idx === -1) {
+    return '.'
+  }
+  return packageJsonPath.slice(0, idx)
 }
 
 function mergedDeps(pkg: Record<string, unknown>): Record<string, string> {
-  const d = pkg.dependencies as Record<string, string> | undefined;
-  const dev = pkg.devDependencies as Record<string, string> | undefined;
-  return { ...(d ?? {}), ...(dev ?? {}) };
+  const d = pkg.dependencies as Record<string, string> | undefined
+  const dev = pkg.devDependencies as Record<string, string> | undefined
+  return { ...d, ...dev }
 }
 
 const GUIDE = `# TanStack Start — manual follow-up
@@ -70,7 +70,7 @@ type Blog = FileRoutesByPath['/blog/$slug']['types']
 
 **R2/R3:** file \`$segments\` = URL shape (not \`/src/app\`); \`Route.useParams\` / \`useSearch\`; splat \`$.tsx\` → \`_splat\` ([splat](https://tanstack.com/router/latest/docs/framework/react/routing/routing-concepts#splat--catch-all-routes)).
 
-**R4h:** \`next/server\` → Fetch primitives (\`NextRequest\`/\`NextResponse\`/\`NextURL\` → \`Request\`/\`Response\`/\`URL\`, \`req.nextUrl\` → \`new URL(req.url)\`, \`NextResponse.rewrite\` → \`Response.redirect\`); \`userAgent\`/\`userAgentFromString\` → \`@edge-runtime/user-agent\`; \`ImageResponse\` → \`next/og\` then **R4i**; \`URLPattern\` import dropped (global); \`after\`/\`connection\` → local shims + TODO; common middleware-related **types** → \`unknown\` stubs + TODO. Vitest middleware tests get Fetch shims (**R4h-bis**). Still manual: \`NextResponse.next\`, \`import * as … from \"next/server\"\`, aliases on Next*, uncommon exports — [server routes](https://tanstack.com/start/latest/docs/framework/react/guide/server-routes).
+**R4h:** \`next/server\` → Fetch primitives (\`NextRequest\`/\`NextResponse\`/\`NextURL\` → \`Request\`/\`Response\`/\`URL\`, \`req.nextUrl\` → \`new URL(req.url)\`, \`NextResponse.rewrite\` → \`Response.redirect\`); \`userAgent\`/\`userAgentFromString\` → \`@edge-runtime/user-agent\`; \`ImageResponse\` → \`next/og\` then **R4i**; \`URLPattern\` import dropped (global); \`after\`/\`connection\` → local shims + TODO; common middleware-related **types** → \`unknown\` stubs + TODO. Vitest middleware tests get Fetch shims (**R4h-bis**). Still manual: \`NextResponse.next\`, \`import * as … from "next/server"\`, aliases on Next*, uncommon exports — [server routes](https://tanstack.com/start/latest/docs/framework/react/guide/server-routes).
 
 ## \`// TODO:\` markers (\`rg '// TODO:'\`)
 
@@ -93,36 +93,36 @@ Finish or delete each TODO. **R4c**/**R4dist** cover most \`dynamic\`/\`script\`
 Install deps; **R11** only changes **\`package.json\`** — run a **normal** install (**not** \`npm ci\`/frozen lock until locks refresh). Re-home packages that peer **next**. **\`vite dev\`** / **\`npm run dev\`**.
 
 Re-check **\`head\`** vs \`metadata\`, monorepo **\`-t\`**, \`next/navigation\` call sites need **\`@tanstack/react-router\`**, ESLint/CI/jsonc, and **\`migrated-from-pages/\`** cleanup.
-`;
+`
 
 const REFERENCE_LINKS = `## Reference links
 
 [Migrate from Next.js](https://tanstack.com/start/latest/docs/framework/react/migrate-from-next-js) · [TanStack Query](https://tanstack.com/query/latest/docs/framework/react/overview) · [Query caching](https://tanstack.com/query/latest/docs/framework/react/guides/caching) · [Router routing](https://tanstack.com/router/latest/docs/framework/react/routing/routing-concepts) · [Server routes](https://tanstack.com/start/latest/docs/framework/react/guide/server-routes) · [Server functions](https://tanstack.com/start/latest/docs/framework/react/guide/server-functions)
-`;
+`
 
 const codemod: Codemod<JSON_TYPES> = async (root, options) => {
-  const file = getFilename(root);
-  if (!file.endsWith("/package.json") && !file.endsWith("package.json")) {
-    return null;
+  const file = getFilename(root)
+  if (!file.endsWith('/package.json') && !file.endsWith('package.json')) {
+    return null
   }
 
-  const rootNode = root.root();
-  let pkg: Record<string, unknown>;
+  const rootNode = root.root()
+  let pkg: Record<string, unknown>
   try {
-    pkg = JSON.parse(rootNode.text()) as Record<string, unknown>;
+    pkg = JSON.parse(rootNode.text()) as Record<string, unknown>
   } catch {
-    return null;
+    return null
   }
 
-  const deps = mergedDeps(pkg);
-  if (!deps["@tanstack/react-start"]) {
-    return null;
+  const deps = mergedDeps(pkg)
+  if (!deps['@tanstack/react-start']) {
+    return null
   }
 
-  const dir = inferPackageRoot(file);
-  const pkgRoot = normalizePath(dir);
-  const r10 = getState<R10Accum>(`mtg:r10:${pkgRoot}`);
-  const r10b = getState<R10bAccum>(`mtg:r10b:${pkgRoot}`);
+  const dir = inferPackageRoot(file)
+  const pkgRoot = normalizePath(dir)
+  const r10 = getState<R10Accum>(`mtg:r10:${pkgRoot}`)
+  const r10b = getState<R10bAccum>(`mtg:r10b:${pkgRoot}`)
   const summary = buildMigrationRunSummarySection({
     packageRoot: relativeToTargetDir(dir, options.targetDir ?? dir),
     stateKeyRoot: pkgRoot,
@@ -130,10 +130,10 @@ const codemod: Codemod<JSON_TYPES> = async (root, options) => {
     r10b,
     r10Metric,
     r10bMetric,
-  });
-  const body = `${GUIDE.trimEnd()}\n\n${summary.trimEnd()}\n\n${REFERENCE_LINKS.trimEnd()}\n`;
-  writeFileSync(join(dir, OUTFILE), body);
-  return null;
-};
+  })
+  const body = `${GUIDE.trimEnd()}\n\n${summary.trimEnd()}\n\n${REFERENCE_LINKS.trimEnd()}\n`
+  writeFileSync(join(dir, OUTFILE), body)
+  return null
+}
 
-export default codemod;
+export default codemod

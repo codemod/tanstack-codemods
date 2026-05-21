@@ -9,21 +9,25 @@
  * removed; brace matching skips strings/templates but not regex literals — rare edge case.
  */
 
-import type { Codemod } from "codemod:ast-grep";
-import type TSX from "codemod:ast-grep/langs/tsx";
-import { readFileSync, writeFileSync } from "fs";
-import { getFilename, normalizePath } from "../utils/paths.ts";
-import { applyRepairRouteTailPipeline } from "../utils/strip-next-pages-data.ts";
+import { readFileSync, writeFileSync } from 'node:fs'
+
+import type { Codemod } from 'codemod:ast-grep'
+import type TSX from 'codemod:ast-grep/langs/tsx'
+
+import { getFilename, normalizePath } from '../utils/paths.ts'
+import { applyRepairRouteTailPipeline } from '../utils/strip-next-pages-data.ts'
 
 const codemod: Codemod<TSX> = async (root) => {
-  const file = normalizePath(getFilename(root));
-  if (!isAppRouteModule(file)) return null;
+  const file = normalizePath(getFilename(root))
+  if (!isAppRouteModule(file)) {
+    return null
+  }
 
-  let source: string;
+  let source: string
   try {
-    source = readFileSync(file).toString();
+    source = readFileSync(file).toString()
   } catch {
-    return null;
+    return null
   }
 
   // Repo packages often include `**/app/**` folders that aren't TanStack file routes
@@ -32,22 +36,25 @@ const codemod: Codemod<TSX> = async (root) => {
   // `libraries/index.ts` must never be truncated.
   // Avoid treating `import { createFileRoute } …` alone as a route module — brace
   // repair must only run when this file actually exports `Route`.
-  if (!/\bexport\s+const\s+Route\s*=/.test(source)) return null;
+  if (!/\bexport\s+const\s+Route\s*=/.test(source)) {
+    return null
+  }
 
-  if (!/\bcreate(File|Root|LazyFile)Route\b/.test(source)) return null;
+  if (!/\bcreate(File|Root|LazyFile)Route\b/.test(source)) {
+    return null
+  }
 
-  const next = applyRepairRouteTailPipeline(source);
-  if (next === source) return null;
+  const next = applyRepairRouteTailPipeline(source)
+  if (next === source) {
+    return null
+  }
 
-  writeFileSync(file, next);
-  return next;
-};
+  writeFileSync(file, next)
+  return next
+}
 
-export default codemod;
+export default codemod
 
 function isAppRouteModule(file: string): boolean {
-  return (
-    /(^|\/)src\/app\/.*\.(tsx|ts|jsx|js)$/.test(file) ||
-    /(^|\/)app\/.*\.(tsx|ts|jsx|js)$/.test(file)
-  );
+  return /(^|\/)src\/app\/.*\.(tsx|ts|jsx|js)$/.test(file) || /(^|\/)app\/.*\.(tsx|ts|jsx|js)$/.test(file)
 }

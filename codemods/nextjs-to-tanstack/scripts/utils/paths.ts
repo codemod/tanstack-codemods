@@ -6,20 +6,21 @@
  * normalises slashes so the same code paths work on Windows hosts.
  */
 
-import { dirname } from "path";
-import type { SgRoot, TypesMap } from "codemod:ast-grep";
+import { dirname } from 'node:path'
 
-const SRC_APP = "/src/app/";
-const SRC_PAGES = "/src/pages/";
+import type { SgRoot, TypesMap } from 'codemod:ast-grep'
+
+const SRC_APP = '/src/app/'
+const SRC_PAGES = '/src/pages/'
 
 export function normalizePath(path: string): string {
-  return path.replace(/\\/g, "/");
+  return path.replaceAll('\\', '/')
 }
 
 /** True for POSIX absolute paths or Windows `C:/...` after normalization. */
 export function isAbsoluteNormalizedPath(path: string): boolean {
-  const n = normalizePath(path);
-  return n.startsWith("/") || /^[A-Za-z]:\//.test(n);
+  const n = normalizePath(path)
+  return n.startsWith('/') || /^[A-Za-z]:\//.test(n)
 }
 
 /**
@@ -27,22 +28,22 @@ export function isAbsoluteNormalizedPath(path: string): boolean {
  * of `src/` or of root `app/` / `pages/` when there is no `src/` prefix).
  */
 export function inferCodemodTargetDir(fileAbs: string): string {
-  const n = normalizePath(fileAbs);
-  const srcIdx = n.lastIndexOf("/src/");
+  const n = normalizePath(fileAbs)
+  const srcIdx = n.lastIndexOf('/src/')
   if (srcIdx > 0) {
-    return n.slice(0, srcIdx);
+    return n.slice(0, srcIdx)
   }
-  const appIdx = n.lastIndexOf("/app/");
-  const pagesIdx = n.lastIndexOf("/pages/");
-  const routerIdx = Math.max(appIdx, pagesIdx);
+  const appIdx = n.lastIndexOf('/app/')
+  const pagesIdx = n.lastIndexOf('/pages/')
+  const routerIdx = Math.max(appIdx, pagesIdx)
   if (routerIdx > 0) {
-    return n.slice(0, routerIdx);
+    return n.slice(0, routerIdx)
   }
-  return dirname(fileAbs);
+  return dirname(fileAbs)
 }
 
 export function getFilename<T extends TypesMap>(root: SgRoot<T>): string {
-  return normalizePath(root.filename());
+  return normalizePath(root.filename())
 }
 
 /**
@@ -55,20 +56,20 @@ export function getFilename<T extends TypesMap>(root: SgRoot<T>): string {
  * match defensively in case the step is run standalone.
  */
 export function getAppRelativePath<T extends TypesMap>(root: SgRoot<T>): string {
-  const file = getFilename(root);
+  const file = getFilename(root)
   for (const marker of [SRC_APP, SRC_PAGES]) {
-    const idx = file.lastIndexOf(marker);
+    const idx = file.lastIndexOf(marker)
     if (idx !== -1) {
-      return file.slice(idx + 1);
+      return file.slice(idx + 1)
     }
   }
-  const pagesIdx = file.lastIndexOf("/pages/");
-  const appIdx = file.lastIndexOf("/app/");
-  const idx = Math.max(pagesIdx, appIdx);
+  const pagesIdx = file.lastIndexOf('/pages/')
+  const appIdx = file.lastIndexOf('/app/')
+  const idx = Math.max(pagesIdx, appIdx)
   if (idx !== -1) {
-    return file.slice(idx + 1);
+    return file.slice(idx + 1)
   }
-  return file;
+  return file
 }
 
 /**
@@ -76,16 +77,16 @@ export function getAppRelativePath<T extends TypesMap>(root: SgRoot<T>): string 
  * absolute path when the package lives outside that root.
  */
 export function relativeToTargetDir(pathAbs: string, targetDir: string): string {
-  const p = normalizePath(pathAbs);
-  const t = normalizePath(targetDir);
+  const p = normalizePath(pathAbs)
+  const t = normalizePath(targetDir)
   if (p === t) {
-    return ".";
+    return '.'
   }
-  const prefix = `${t}/`;
+  const prefix = `${t}/`
   if (p.startsWith(prefix)) {
-    return p.slice(prefix.length);
+    return p.slice(prefix.length)
   }
-  return p;
+  return p
 }
 
 /**
@@ -93,30 +94,27 @@ export function relativeToTargetDir(pathAbs: string, targetDir: string): string 
  * current file's directory when the input isn't under a known router tree so
  * tests that live outside the conventional tree still function.
  */
-export function resolveRenameTarget<T extends TypesMap>(
-  root: SgRoot<T>,
-  computedNewPath: string
-): string {
-  const normalized = normalizePath(computedNewPath);
+export function resolveRenameTarget<T extends TypesMap>(root: SgRoot<T>, computedNewPath: string): string {
+  const normalized = normalizePath(computedNewPath)
   if (isAbsoluteNormalizedPath(normalized)) {
-    return normalized;
+    return normalized
   }
-  const file = getFilename(root);
+  const file = getFilename(root)
   for (const marker of [SRC_APP, SRC_PAGES]) {
-    const idx = file.lastIndexOf(marker);
+    const idx = file.lastIndexOf(marker)
     if (idx !== -1) {
-      const baseAbs = file.slice(0, idx + 1);
-      return `${baseAbs}${computedNewPath}`;
+      const baseAbs = file.slice(0, idx + 1)
+      return `${baseAbs}${computedNewPath}`
     }
   }
-  const pagesIdx = file.lastIndexOf("/pages/");
-  const appIdx = file.lastIndexOf("/app/");
-  const idx = Math.max(pagesIdx, appIdx);
+  const pagesIdx = file.lastIndexOf('/pages/')
+  const appIdx = file.lastIndexOf('/app/')
+  const idx = Math.max(pagesIdx, appIdx)
   if (idx !== -1) {
-    const baseAbs = file.slice(0, idx + 1);
-    return `${baseAbs}${computedNewPath}`;
+    const baseAbs = file.slice(0, idx + 1)
+    return `${baseAbs}${computedNewPath}`
   }
-  const dir = file.slice(0, file.lastIndexOf("/"));
-  const leaf = computedNewPath.split("/").pop() ?? computedNewPath;
-  return `${dir}/${leaf}`;
+  const dir = file.slice(0, file.lastIndexOf('/'))
+  const leaf = computedNewPath.split('/').pop() ?? computedNewPath
+  return `${dir}/${leaf}`
 }

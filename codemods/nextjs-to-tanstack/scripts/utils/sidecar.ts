@@ -11,84 +11,86 @@
  * capabilities are required.
  */
 
-import { mkdirSync, readFileSync, writeFileSync } from "fs";
-import { dirname, join } from "path";
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 
-const DEFAULT_FILE = ".codemod/state.json";
+const DEFAULT_FILE = '.codemod/state.json'
 
 export interface LocalFontFace {
   /** Path to the font file, POSIX relative to the package root (e.g. `src/fonts/x.woff2`). */
-  repoRelativePath: string;
-  weight?: string | null;
-  style?: string | null;
+  repoRelativePath: string
+  weight?: string | null
+  style?: string | null
 }
 
 export interface FontEntry {
   /** Either "next/font/google" or "next/font/local". */
-  importSource: "next/font/google" | "next/font/local";
+  importSource: 'next/font/google' | 'next/font/local'
   /** Display name, e.g. "Inter". For `next/font/local` this is the binding name unless `fontFaceFamily` is set. */
-  family: string;
+  family: string
   /** kebab-cased family used for `@fontsource-variable/<packageKey>` (Google only). */
-  packageKey: string;
+  packageKey: string
   /** Variable option supplied to the Next helper, e.g. "--font-sans". */
-  variable: string | null;
+  variable: string | null
   /** Google: `subsets` option from `next/font/google` (informational). */
-  googleSubsets?: string[] | null;
+  googleSubsets?: string[] | null
   /** Local: explicit `family` string from `localFont({ family: "…" })` when present. */
-  fontFaceFamily?: string | null;
+  fontFaceFamily?: string | null
   /** Local: one or more files for `@font-face` `src: url(…)`. */
-  localFaces?: LocalFontFace[] | null;
+  localFaces?: LocalFontFace[] | null
   /** Local: top-level `display` from `localFont({ … })`. */
-  fontDisplay?: string | null;
+  fontDisplay?: string | null
 }
 
 /** Only `next/font/google` families are published as `@fontsource-variable/*` on npm. */
 export function hasFontsourcePackage(font: FontEntry): boolean {
-  return font.importSource === "next/font/google";
+  return font.importSource === 'next/font/google'
 }
 
 export interface SidecarState {
-  fonts: FontEntry[];
+  fonts: FontEntry[]
 }
 
-const EMPTY: SidecarState = { fonts: [] };
+const EMPTY: SidecarState = { fonts: [] }
 
 function resolveFilePath(targetDir: string, file = DEFAULT_FILE): string {
-  return join(targetDir, file);
+  return join(targetDir, file)
 }
 
 export function readSidecar(targetDir: string, file = DEFAULT_FILE): SidecarState {
-  const fullPath = resolveFilePath(targetDir, file);
+  const fullPath = resolveFilePath(targetDir, file)
   try {
-    const raw = readFileSync(fullPath, "utf8");
-    const parsed = JSON.parse(raw) as Partial<SidecarState> | null;
+    const raw = readFileSync(fullPath, 'utf8')
+    const parsed = JSON.parse(raw) as Partial<SidecarState> | null
     return {
       fonts: Array.isArray(parsed?.fonts) ? parsed.fonts : [],
-    };
+    }
   } catch {
-    return { ...EMPTY };
+    return { ...EMPTY }
   }
 }
 
 export function writeSidecar(targetDir: string, state: SidecarState, file = DEFAULT_FILE): void {
-  const fullPath = resolveFilePath(targetDir, file);
-  const dir = dirname(fullPath);
-  mkdirSync(dir, { recursive: true });
-  writeFileSync(fullPath, `${JSON.stringify(state, null, 2)}\n`);
+  const fullPath = resolveFilePath(targetDir, file)
+  const dir = dirname(fullPath)
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(fullPath, `${JSON.stringify(state, null, 2)}\n`)
 }
 
 /**
  * Append new font entries, deduping on `packageKey`. Returns the merged state.
  */
 export function addFontEntries(state: SidecarState, entries: FontEntry[]): SidecarState {
-  const seen = new Set(state.fonts.map((f) => f.packageKey));
-  const fonts = [...state.fonts];
+  const seen = new Set(state.fonts.map((f) => f.packageKey))
+  const fonts = [...state.fonts]
   for (const entry of entries) {
-    if (seen.has(entry.packageKey)) continue;
-    fonts.push(entry);
-    seen.add(entry.packageKey);
+    if (seen.has(entry.packageKey)) {
+      continue
+    }
+    fonts.push(entry)
+    seen.add(entry.packageKey)
   }
-  return { ...state, fonts };
+  return { ...state, fonts }
 }
 
 /**
@@ -97,7 +99,7 @@ export function addFontEntries(state: SidecarState, entries: FontEntry[]): Sidec
  */
 export function familyToPackageKey(family: string): string {
   return family
-    .replace(/[_\s]+/g, "-")
-    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
-    .toLowerCase();
+    .replaceAll(/[_\s]+/g, '-')
+    .replaceAll(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .toLowerCase()
 }

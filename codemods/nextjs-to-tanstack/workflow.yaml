@@ -5,43 +5,43 @@
 # or `apps/foo/pages/...` match.
 # In huge monorepos, pass `-t` to the Next.js package you are migrating to limit scope.
 #
-version: "1"
+version: '1'
 
 params:
   schema:
     enableAiFollowupFixups:
-      name: "Enable AI Follow-up Fixups"
-      description: "Run AI step for remaining TODOs and TANSTACK_MIGRATION_NEXT_STEPS tasks."
+      name: 'Enable AI Follow-up Fixups'
+      description: 'Run AI step for remaining TODOs and TANSTACK_MIGRATION_NEXT_STEPS tasks.'
       type: string
-      default: "false"
+      default: 'false'
 
 x-shared-excludes: &shared-excludes
-  - "**/node_modules/**"
-  - "**/.next/**"
-  - "**/dist/**"
-  - "**/build/**"
-  - "**/coverage/**"
-  - "**/.git/**"
-  - "**/.*/**"
+  - '**/node_modules/**'
+  - '**/.next/**'
+  - '**/dist/**'
+  - '**/build/**'
+  - '**/coverage/**'
+  - '**/.git/**'
+  - '**/.*/**'
   # Backup tree emitted late in the workflow — exclude everywhere so earlier passes never scan/write here (also avoids failures when leftover dirs have awkward ownership/perms).
-  - "**/migrated-from-pages/**"
-  - "**/*.d.ts"
+  - '**/migrated-from-pages/**'
+  - '**/*.d.ts'
 
 # Cross-cutting transforms: any `.ts`/`.tsx`/`.js`/`.jsx` under the workflow target (`-t`).
 # Use `-t <package-root>` in monorepos to avoid scanning the whole repo.
 x-cross-cutting-ts: &cross-cutting-ts
-  - "**/*.tsx"
-  - "**/*.jsx"
-  - "**/*.ts"
-  - "**/*.js"
+  - '**/*.tsx'
+  - '**/*.jsx'
+  - '**/*.ts'
+  - '**/*.js'
 
 x-cross-cutting-tsx: &cross-cutting-tsx
-  - "**/*.tsx"
-  - "**/*.jsx"
+  - '**/*.tsx'
+  - '**/*.jsx'
 
 x-cross-cutting-server-fn: &cross-cutting-server-fn
-  - "**/*.ts"
-  - "**/*.tsx"
+  - '**/*.ts'
+  - '**/*.tsx'
 
 nodes:
   - id: cleanup-obsolete-files
@@ -54,15 +54,15 @@ nodes:
           js_file: scripts/entries/cleanup-obsolete-files.ts
           language: tsx
           include:
-            - "**/next.config.js"
-            - "**/next.config.mjs"
-            - "**/next.config.cjs"
-            - "**/next.config.ts"
-            - "**/next.config.mts"
-            - "**/next.config.cts"
-            - "**/postcss.config.js"
-            - "**/postcss.config.mjs"
-            - "**/postcss.config.cjs"
+            - '**/next.config.js'
+            - '**/next.config.mjs'
+            - '**/next.config.cjs'
+            - '**/next.config.ts'
+            - '**/next.config.mts'
+            - '**/next.config.cts'
+            - '**/postcss.config.js'
+            - '**/postcss.config.mjs'
+            - '**/postcss.config.cjs'
           exclude: *shared-excludes
 
   - id: scaffold-tanstack-files
@@ -76,7 +76,7 @@ nodes:
           js_file: scripts/entries/scaffold-tanstack-files.ts
           language: json
           include:
-            - "**/package.json"
+            - '**/package.json'
           exclude: *shared-excludes
 
   # ---- Structural rewrites (file-shape-changing, ordered) ----
@@ -91,14 +91,14 @@ nodes:
           js_file: scripts/entries/rewrite-root-layout.ts
           language: tsx
           include:
-            - "**/src/app/layout.tsx"
-            - "**/src/app/layout.jsx"
-            - "**/app/layout.tsx"
-            - "**/app/layout.jsx"
-            - "**/src/pages/_app.tsx"
-            - "**/src/pages/_app.jsx"
-            - "**/pages/_app.tsx"
-            - "**/pages/_app.jsx"
+            - '**/src/app/layout.tsx'
+            - '**/src/app/layout.jsx'
+            - '**/app/layout.tsx'
+            - '**/app/layout.jsx'
+            - '**/src/pages/_app.tsx'
+            - '**/src/pages/_app.jsx'
+            - '**/pages/_app.tsx'
+            - '**/pages/_app.jsx'
           exclude: *shared-excludes
 
   - id: rewrite-api-routes
@@ -111,18 +111,18 @@ nodes:
           js_file: scripts/entries/rewrite-api-routes.ts
           language: tsx
           include:
-            - "**/src/app/**/route.ts"
-            - "**/src/app/**/route.js"
-            - "**/app/**/route.ts"
-            - "**/app/**/route.js"
-            - "**/src/app/api/**/*.ts"
-            - "**/src/app/api/**/*.js"
-            - "**/app/api/**/*.ts"
-            - "**/app/api/**/*.js"
-            - "**/src/pages/api/**/*.ts"
-            - "**/src/pages/api/**/*.js"
-            - "**/pages/api/**/*.ts"
-            - "**/pages/api/**/*.js"
+            - '**/src/app/**/route.ts'
+            - '**/src/app/**/route.js'
+            - '**/app/**/route.ts'
+            - '**/app/**/route.js'
+            - '**/src/app/api/**/*.ts'
+            - '**/src/app/api/**/*.js'
+            - '**/app/api/**/*.ts'
+            - '**/app/api/**/*.js'
+            - '**/src/pages/api/**/*.ts'
+            - '**/src/pages/api/**/*.js'
+            - '**/pages/api/**/*.ts'
+            - '**/pages/api/**/*.js'
           exclude: *shared-excludes
 
   - id: rewrite-pages
@@ -135,14 +135,14 @@ nodes:
           js_file: scripts/entries/rewrite-pages.ts
           language: tsx
           include:
-            - "**/src/app/**/page.tsx"
-            - "**/src/app/**/page.jsx"
-            - "**/app/**/page.tsx"
-            - "**/app/**/page.jsx"
-            - "**/src/pages/**/*.tsx"
-            - "**/src/pages/**/*.jsx"
-            - "**/pages/**/*.tsx"
-            - "**/pages/**/*.jsx"
+            - '**/src/app/**/page.tsx'
+            - '**/src/app/**/page.jsx'
+            - '**/app/**/page.tsx'
+            - '**/app/**/page.jsx'
+            - '**/src/pages/**/*.tsx'
+            - '**/src/pages/**/*.jsx'
+            - '**/pages/**/*.tsx'
+            - '**/pages/**/*.jsx'
           exclude: *shared-excludes
 
   - id: repair-route-file-tails-post-pages
@@ -155,14 +155,14 @@ nodes:
           js_file: scripts/entries/repair-route-file-tails.ts
           language: tsx
           include:
-            - "**/src/app/**/*.ts"
-            - "**/src/app/**/*.tsx"
-            - "**/src/app/**/*.js"
-            - "**/src/app/**/*.jsx"
-            - "**/app/**/*.ts"
-            - "**/app/**/*.tsx"
-            - "**/app/**/*.js"
-            - "**/app/**/*.jsx"
+            - '**/src/app/**/*.ts'
+            - '**/src/app/**/*.tsx'
+            - '**/src/app/**/*.js'
+            - '**/src/app/**/*.jsx'
+            - '**/app/**/*.ts'
+            - '**/app/**/*.tsx'
+            - '**/app/**/*.js'
+            - '**/app/**/*.jsx'
           exclude: *shared-excludes
 
   - id: rewrite-special-next-files
@@ -175,22 +175,22 @@ nodes:
           js_file: scripts/entries/rewrite-special-next-files.ts
           language: tsx
           include:
-            - "**/src/app/loading.tsx"
-            - "**/src/app/error.tsx"
-            - "**/src/app/not-found.tsx"
-            - "**/src/app/template.tsx"
-            - "**/src/app/**/loading.tsx"
-            - "**/src/app/**/error.tsx"
-            - "**/src/app/**/not-found.tsx"
-            - "**/src/app/**/template.tsx"
-            - "**/app/loading.tsx"
-            - "**/app/error.tsx"
-            - "**/app/not-found.tsx"
-            - "**/app/template.tsx"
-            - "**/app/**/loading.tsx"
-            - "**/app/**/error.tsx"
-            - "**/app/**/not-found.tsx"
-            - "**/app/**/template.tsx"
+            - '**/src/app/loading.tsx'
+            - '**/src/app/error.tsx'
+            - '**/src/app/not-found.tsx'
+            - '**/src/app/template.tsx'
+            - '**/src/app/**/loading.tsx'
+            - '**/src/app/**/error.tsx'
+            - '**/src/app/**/not-found.tsx'
+            - '**/src/app/**/template.tsx'
+            - '**/app/loading.tsx'
+            - '**/app/error.tsx'
+            - '**/app/not-found.tsx'
+            - '**/app/template.tsx'
+            - '**/app/**/loading.tsx'
+            - '**/app/**/error.tsx'
+            - '**/app/**/not-found.tsx'
+            - '**/app/**/template.tsx'
           exclude: *shared-excludes
 
   - id: prune-empty-next-route-dirs
@@ -203,7 +203,7 @@ nodes:
           js_file: scripts/entries/prune-empty-next-route-dirs.ts
           language: json
           include:
-            - "**/package.json"
+            - '**/package.json'
           exclude: *shared-excludes
 
   # ---- Post-structure rewrites (operate on already-renamed files) ----
@@ -218,10 +218,10 @@ nodes:
           js_file: scripts/entries/rewrite-dynamic-params.ts
           language: tsx
           include:
-            - "**/src/app/**/*.tsx"
-            - "**/src/app/**/*.jsx"
-            - "**/app/**/*.tsx"
-            - "**/app/**/*.jsx"
+            - '**/src/app/**/*.tsx'
+            - '**/src/app/**/*.jsx'
+            - '**/app/**/*.tsx'
+            - '**/app/**/*.jsx'
           exclude: *shared-excludes
 
   - id: rewrite-metadata
@@ -234,10 +234,10 @@ nodes:
           js_file: scripts/entries/rewrite-metadata.ts
           language: tsx
           include:
-            - "**/src/app/__root.tsx"
-            - "**/src/app/**/*.tsx"
-            - "**/app/__root.tsx"
-            - "**/app/**/*.tsx"
+            - '**/src/app/__root.tsx'
+            - '**/src/app/**/*.tsx'
+            - '**/app/__root.tsx'
+            - '**/app/**/*.tsx'
           exclude: *shared-excludes
 
   # ---- Cross-cutting rewrites (deep src/ + app dirs, any depth under target) ----
@@ -398,14 +398,14 @@ nodes:
           js_file: scripts/entries/migrate-next-metadata-images.ts
           language: tsx
           include:
-            - "**/src/app/**/opengraph-image.tsx"
-            - "**/src/app/**/opengraph-image.ts"
-            - "**/src/app/**/twitter-image.tsx"
-            - "**/src/app/**/twitter-image.ts"
-            - "**/app/**/opengraph-image.tsx"
-            - "**/app/**/opengraph-image.ts"
-            - "**/app/**/twitter-image.tsx"
-            - "**/app/**/twitter-image.ts"
+            - '**/src/app/**/opengraph-image.tsx'
+            - '**/src/app/**/opengraph-image.ts'
+            - '**/src/app/**/twitter-image.tsx'
+            - '**/src/app/**/twitter-image.ts'
+            - '**/app/**/opengraph-image.tsx'
+            - '**/app/**/opengraph-image.ts'
+            - '**/app/**/twitter-image.tsx'
+            - '**/app/**/twitter-image.ts'
           exclude: *shared-excludes
 
   - id: annotate-async-pages
@@ -431,10 +431,10 @@ nodes:
           js_file: scripts/entries/rewrite-next-pages-data.ts
           language: tsx
           include:
-            - "**/src/app/**/*.tsx"
-            - "**/src/app/**/*.jsx"
-            - "**/app/**/*.tsx"
-            - "**/app/**/*.jsx"
+            - '**/src/app/**/*.tsx'
+            - '**/src/app/**/*.jsx'
+            - '**/app/**/*.tsx'
+            - '**/app/**/*.jsx'
           exclude: *shared-excludes
 
   - id: repair-route-file-tails
@@ -447,14 +447,14 @@ nodes:
           js_file: scripts/entries/repair-route-file-tails.ts
           language: tsx
           include:
-            - "**/src/app/**/*.ts"
-            - "**/src/app/**/*.tsx"
-            - "**/src/app/**/*.js"
-            - "**/src/app/**/*.jsx"
-            - "**/app/**/*.ts"
-            - "**/app/**/*.tsx"
-            - "**/app/**/*.js"
-            - "**/app/**/*.jsx"
+            - '**/src/app/**/*.ts'
+            - '**/src/app/**/*.tsx'
+            - '**/src/app/**/*.js'
+            - '**/src/app/**/*.jsx'
+            - '**/app/**/*.ts'
+            - '**/app/**/*.tsx'
+            - '**/app/**/*.js'
+            - '**/app/**/*.jsx'
           exclude: *shared-excludes
 
   - id: rewrite-next-types
@@ -505,10 +505,10 @@ nodes:
           js_file: scripts/entries/patch-globals-css.ts
           language: css
           include:
-            - "**/src/app/globals.css"
-            - "**/app/globals.css"
-            - "**/src/styles/globals.css"
-            - "**/styles/globals.css"
+            - '**/src/app/globals.css'
+            - '**/app/globals.css'
+            - '**/src/styles/globals.css'
+            - '**/styles/globals.css'
           exclude: *shared-excludes
 
   - id: patch-package-json
@@ -521,7 +521,7 @@ nodes:
           js_file: scripts/entries/patch-package-json.ts
           language: json
           include:
-            - "**/package.json"
+            - '**/package.json'
           exclude: *shared-excludes
 
   - id: patch-cjs-root-configs-for-esm
@@ -534,7 +534,7 @@ nodes:
           js_file: scripts/entries/patch-cjs-root-configs-for-esm.ts
           language: json
           include:
-            - "**/package.json"
+            - '**/package.json'
           exclude: *shared-excludes
 
   - id: patch-tooling-and-docs
@@ -547,7 +547,7 @@ nodes:
           js_file: scripts/entries/patch-tooling-and-docs.ts
           language: json
           include:
-            - "**/package.json"
+            - '**/package.json'
           exclude: *shared-excludes
 
   - id: cleanup-legacy-pages
@@ -560,7 +560,7 @@ nodes:
           js_file: scripts/entries/cleanup-legacy-pages-dir.ts
           language: json
           include:
-            - "**/package.json"
+            - '**/package.json'
           exclude: *shared-excludes
 
   - id: ensure-app-root
@@ -573,7 +573,7 @@ nodes:
           js_file: scripts/entries/ensure-app-root.ts
           language: json
           include:
-            - "**/package.json"
+            - '**/package.json'
           exclude: *shared-excludes
 
   - id: patch-root-i18n-provider
@@ -586,7 +586,7 @@ nodes:
           js_file: scripts/entries/patch-root-i18n-provider.ts
           language: json
           include:
-            - "**/package.json"
+            - '**/package.json'
           exclude: *shared-excludes
 
   - id: write-migration-guide
@@ -599,7 +599,7 @@ nodes:
           js_file: scripts/entries/write-migration-guide.ts
           language: json
           include:
-            - "**/package.json"
+            - '**/package.json'
           exclude: *shared-excludes
 
   - id: ai-followup-fixups
@@ -610,7 +610,7 @@ nodes:
       - name: Apply safe fixes from TODOs and TANSTACK_MIGRATION_NEXT_STEPS.md
         if: params.enableAiFollowupFixups == "true"
         ai:
-          model: "gpt-4o"
+          model: 'gpt-4o'
           max_steps: 60
           prompt: |
             You are finishing a Next.js -> TanStack Start migration.
@@ -644,5 +644,5 @@ nodes:
           js_file: scripts/entries/finalize-cleanup.ts
           language: json
           include:
-            - "**/package.json"
+            - '**/package.json'
           exclude: *shared-excludes

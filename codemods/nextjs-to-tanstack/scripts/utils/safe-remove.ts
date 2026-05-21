@@ -7,33 +7,36 @@
  * by importing the `fs` namespace and probing for functions at runtime.
  */
 
-import * as _fs from "fs";
-import { join } from "path";
+import * as _fs from 'node:fs'
+import { join } from 'node:path'
 
-type RmOpts = { recursive?: boolean; force?: boolean };
+interface RmOpts {
+  recursive?: boolean
+  force?: boolean
+}
 
 type FsWithOptionalRm = typeof _fs & {
-  rmSync?: (p: string, o?: RmOpts) => void;
-  rmdirSync?: (p: string) => void;
-  unlinkSync?: (p: string) => void;
-};
-const fsProbe = _fs as FsWithOptionalRm;
-const _rmSync = fsProbe.rmSync;
-const _rmdirSync = fsProbe.rmdirSync;
-const _unlinkSync = fsProbe.unlinkSync;
+  rmSync?: (p: string, o?: RmOpts) => void
+  rmdirSync?: (p: string) => void
+  unlinkSync?: (p: string) => void
+}
+const fsProbe = _fs as FsWithOptionalRm
+const _rmSync = fsProbe.rmSync
+const _rmdirSync = fsProbe.rmdirSync
+const _unlinkSync = fsProbe.unlinkSync
 
 export function safeRemoveFile(path: string): void {
   if (_rmSync) {
-    _rmSync(path, { force: true });
-    return;
+    _rmSync(path, { force: true })
+    return
   }
   if (_unlinkSync) {
     try {
-      _unlinkSync(path);
+      _unlinkSync(path)
     } catch {
       /* already absent */
     }
-    return;
+    return
   }
 }
 
@@ -44,27 +47,27 @@ export function safeRemoveFile(path: string): void {
  */
 export function safeRemoveDir(path: string): void {
   if (_rmSync) {
-    _rmSync(path, { recursive: true, force: true });
-    return;
+    _rmSync(path, { recursive: true, force: true })
+    return
   }
-  recursiveRemove(path);
+  recursiveRemove(path)
 }
 
 function recursiveRemove(dirPath: string): void {
-  let entries: string[];
+  let entries: string[]
   try {
-    entries = _fs.readdirSync(dirPath);
+    entries = _fs.readdirSync(dirPath)
   } catch {
-    return;
+    return
   }
   for (const name of entries) {
-    const full = join(dirPath, name);
+    const full = join(dirPath, name)
     try {
-      const st = _fs.statSync(full);
+      const st = _fs.statSync(full)
       if (st.isDirectory()) {
-        recursiveRemove(full);
+        recursiveRemove(full)
       } else {
-        safeRemoveFile(full);
+        safeRemoveFile(full)
       }
     } catch {
       /* stat or remove failed — skip */
@@ -72,7 +75,7 @@ function recursiveRemove(dirPath: string): void {
   }
   if (_rmdirSync) {
     try {
-      _rmdirSync(dirPath);
+      _rmdirSync(dirPath)
     } catch {
       /* non-empty or busy */
     }
@@ -81,15 +84,17 @@ function recursiveRemove(dirPath: string): void {
 
 export function safeRmdirIfEmpty(path: string): boolean {
   try {
-    const entries = _fs.readdirSync(path);
-    if (entries.length > 0) return false;
-    if (_rmdirSync) {
-      _rmdirSync(path);
-    } else if (_rmSync) {
-      _rmSync(path, { recursive: true, force: true });
+    const entries = _fs.readdirSync(path)
+    if (entries.length > 0) {
+      return false
     }
-    return true;
+    if (_rmdirSync) {
+      _rmdirSync(path)
+    } else if (_rmSync) {
+      _rmSync(path, { recursive: true, force: true })
+    }
+    return true
   } catch {
-    return false;
+    return false
   }
 }

@@ -6,9 +6,10 @@
  * Strips `vi.mock("next/server", …)` factories when present. Injects local `Request`/`Response`-compatible shims.
  */
 
-import type { Codemod } from "codemod:ast-grep";
-import type TSX from "codemod:ast-grep/langs/tsx";
-import { getFilename, normalizePath } from "../utils/paths.ts";
+import type { Codemod } from 'codemod:ast-grep'
+import type TSX from 'codemod:ast-grep/langs/tsx'
+
+import { getFilename, normalizePath } from '../utils/paths.ts'
 
 const SHIM = `
 type NextResponseInit = ResponseInit & { request?: { headers?: Headers } };
@@ -82,145 +83,161 @@ class NextRequest extends Request {
   };
 }
 
-`;
+`
 
 const codemod: Codemod<TSX> = async (root) => {
-  const rootNode = root.root();
-  const file = normalizePath(getFilename(root));
+  const rootNode = root.root()
+  const file = normalizePath(getFilename(root))
   if (!/\.(test|spec)\.(m?[tj]sx?|m?[tj]s)$/.test(file)) {
-    return null;
+    return null
   }
 
-  let s = rootNode.text();
-  if (!/next\/server/.test(s)) return null;
+  let s = rootNode.text()
+  if (!s.includes('next/server')) {
+    return null
+  }
 
   const needsShim =
     /\bvi\.mock\s*\(\s*["']next\/server["']/.test(s) ||
     /\bNextResponse\.next\b/.test(s) ||
-    /\bNextResponse\.rewrite\b/.test(s);
-  if (!needsShim) return null;
+    /\bNextResponse\.rewrite\b/.test(s)
+  if (!needsShim) {
+    return null
+  }
 
-  s = s.replace(/^\/\/ TODO: remaining `next\/server`[^\n]*\r?\n/gm, "");
+  s = s.replaceAll(/^\/\/ TODO: remaining `next\/server`[^\n]*\r?\n/gm, '')
 
-  s = stripViMockNextServer(s);
-  s = s.replace(/^[ \t]*.*?vi\.importActual\s*\(\s*["']next\/server["']\)\s*;?\s*\r?\n/gm, "");
+  s = stripViMockNextServer(s)
+  s = s.replaceAll(/^[ \t]*.*?vi\.importActual\s*\(\s*["']next\/server["']\)\s*;?\s*\r?\n/gm, '')
 
-  s = s.replace(
-    /^[ \t]*import\s+(?:type\s+)?\{[^}]*\}\s*from\s*["']next\/server["']\s*;?\s*\r?\n/gm,
-    ""
-  );
-  s = s.replace(
-    /^[ \t]*import\s+type\s+\{\s*NextRequest\s*\}\s*from\s*["']next\/server["']\s*;?\s*\r?\n/gm,
-    ""
-  );
-  s = s.replace(
-    /^[ \t]*import\s+type\s+\{\s*NextResponse\s*\}\s*from\s*["']next\/server["']\s*;?\s*\r?\n/gm,
-    ""
-  );
+  s = s.replaceAll(/^[ \t]*import\s+(?:type\s+)?\{[^}]*\}\s*from\s*["']next\/server["']\s*;?\s*\r?\n/gm, '')
+  s = s.replaceAll(/^[ \t]*import\s+type\s+\{\s*NextRequest\s*\}\s*from\s*["']next\/server["']\s*;?\s*\r?\n/gm, '')
+  s = s.replaceAll(/^[ \t]*import\s+type\s+\{\s*NextResponse\s*\}\s*from\s*["']next\/server["']\s*;?\s*\r?\n/gm, '')
 
-  const insertAt = findLastImportEnd(s);
-  s = s.slice(0, insertAt) + SHIM + s.slice(insertAt);
+  const insertAt = findLastImportEnd(s)
+  s = s.slice(0, insertAt) + SHIM + s.slice(insertAt)
 
-  if (s === rootNode.text()) return null;
-  const r = rootNode.range();
-  return rootNode.commitEdits([{ startPos: r.start.index, endPos: r.end.index, insertedText: s }]);
-};
+  if (s === rootNode.text()) {
+    return null
+  }
+  const r = rootNode.range()
+  return rootNode.commitEdits([{ startPos: r.start.index, endPos: r.end.index, insertedText: s }])
+}
 
-export default codemod;
+export default codemod
 
 function findLastImportEnd(s: string): number {
-  const lines = s.split("\n");
-  let lastEnd = 0;
-  let offset = 0;
+  const lines = s.split('\n')
+  let lastEnd = 0
+  let offset = 0
   for (const line of lines) {
     if (/^\s*import\s+/.test(line)) {
-      lastEnd = offset + line.length;
+      lastEnd = offset + line.length
     }
-    offset += line.length + 1;
+    offset += line.length + 1
   }
-  if (lastEnd === 0) return 0;
-  const nl = s[lastEnd] === "\r" ? 2 : 1;
-  return lastEnd < s.length && s[lastEnd] === "\n" ? lastEnd + 1 : lastEnd + nl;
+  if (lastEnd === 0) {
+    return 0
+  }
+  const nl = s[lastEnd] === '\r' ? 2 : 1
+  return lastEnd < s.length && s[lastEnd] === '\n' ? lastEnd + 1 : lastEnd + nl
 }
 
 function stripViMockNextServer(s: string): string {
-  const re = /vi\.mock\s*\(\s*["']next\/server["']/g;
-  let out = s;
-  let match: RegExpExecArray | null = re.exec(out);
+  const re = /vi\.mock\s*\(\s*["']next\/server["']/g
+  let out = s
+  let match: RegExpExecArray | null = re.exec(out)
   while (match !== null) {
-    const start = match.index;
-    const openParen = out.indexOf("(", start);
-    if (openParen === -1) break;
-    const end = findMatchingCloseParen(out, openParen);
-    if (end === -1) break;
-    let after = end + 1;
-    while (after < out.length) {
-      const ch = out[after];
-      if (ch === undefined || !/\s/.test(ch)) break;
-      after++;
+    const start = match.index
+    const openParen = out.indexOf('(', start)
+    if (openParen === -1) {
+      break
     }
-    if (out[after] === ";") after++;
-    out = out.slice(0, start) + out.slice(after);
-    re.lastIndex = start;
-    match = re.exec(out);
+    const end = findMatchingCloseParen(out, openParen)
+    if (end === -1) {
+      break
+    }
+    let after = end + 1
+    while (after < out.length) {
+      const ch = out[after]
+      if (ch === undefined || !/\s/.test(ch)) {
+        break
+      }
+      after++
+    }
+    if (out[after] === ';') {
+      after++
+    }
+    out = out.slice(0, start) + out.slice(after)
+    re.lastIndex = start
+    match = re.exec(out)
   }
-  return out;
+  return out
 }
 
 function findMatchingCloseParen(src: string, openIdx: number): number {
-  let depth = 0;
-  let i = openIdx;
-  let quote: string | null = null;
-  let lineComment = false;
-  let blockComment = false;
+  let depth = 0
+  let i = openIdx
+  let quote: string | null = null
+  let lineComment = false
+  let blockComment = false
   while (i < src.length) {
-    const ch = src[i];
-    if (ch === undefined) break;
-    const next = src[i + 1];
+    const ch = src[i]
+    if (ch === undefined) {
+      break
+    }
+    const next = src[i + 1]
     if (lineComment) {
-      if (ch === "\n") lineComment = false;
-      i++;
-      continue;
+      if (ch === '\n') {
+        lineComment = false
+      }
+      i++
+      continue
     }
     if (blockComment) {
-      if (ch === "*" && next === "/") {
-        blockComment = false;
-        i += 2;
-        continue;
+      if (ch === '*' && next === '/') {
+        blockComment = false
+        i += 2
+        continue
       }
-      i++;
-      continue;
+      i++
+      continue
     }
     if (quote) {
-      if (ch === "\\") {
-        i += 2;
-        continue;
+      if (ch === '\\') {
+        i += 2
+        continue
       }
-      if (ch === quote) quote = null;
-      i++;
-      continue;
+      if (ch === quote) {
+        quote = null
+      }
+      i++
+      continue
     }
-    if (ch === "/" && next === "/") {
-      lineComment = true;
-      i += 2;
-      continue;
+    if (ch === '/' && next === '/') {
+      lineComment = true
+      i += 2
+      continue
     }
-    if (ch === "/" && next === "*") {
-      blockComment = true;
-      i += 2;
-      continue;
+    if (ch === '/' && next === '*') {
+      blockComment = true
+      i += 2
+      continue
     }
-    if (ch === '"' || ch === "'" || ch === "`") {
-      quote = ch;
-      i++;
-      continue;
+    if (ch === '"' || ch === "'" || ch === '`') {
+      quote = ch
+      i++
+      continue
     }
-    if (ch === "(") depth++;
-    else if (ch === ")") {
-      depth--;
-      if (depth === 0) return i;
+    if (ch === '(') {
+      depth++
+    } else if (ch === ')') {
+      depth--
+      if (depth === 0) {
+        return i
+      }
     }
-    i++;
+    i++
   }
-  return -1;
+  return -1
 }

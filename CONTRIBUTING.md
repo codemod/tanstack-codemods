@@ -6,7 +6,7 @@ Using an AI coding agent (Codex, Cursor, Claude Code, Aider, etc.)? See [`AGENTS
 
 ## Development setup
 
-This repository uses **pnpm** (see `packageManager` in the root `package.json`), **Changesets** for releases, and **Biome** (not Prettier/ESLint) for formatting and linting.
+This repository uses **pnpm** (see `packageManager` in the root `package.json`), **Changesets** for releases, and **oxfmt + oxlint** (not Prettier/ESLint) for formatting and linting.
 
 ```bash
 # Install dependencies (also wires the Husky pre-commit hook)
@@ -55,7 +55,7 @@ Use Node **22** locally (see [`.nvmrc`](./.nvmrc)) to match CI.
 
 ## Pre-commit hook
 
-After `pnpm install`, Husky runs **lint-staged** before each commit: Biome format and lint on staged files, plus targeted `pnpm test` when you touch `codemods/**/scripts/**/*.ts`. If something fails, fix or stage the updates and try again.
+After `pnpm install`, Husky runs **lint-staged** before each commit: oxfmt and oxlint on staged files, plus targeted `pnpm test` when you touch `codemods/**/scripts/**/*.ts`. If something fails, fix or stage the updates and try again.
 
 The hook only inspects **staged** files. Files you did not touch can still fail a full-repo `pnpm run format:check` / `pnpm run lint` — CI focuses on **changed** paths for pull requests.
 
@@ -63,7 +63,7 @@ The hook only inspects **staged** files. Files you did not touch can still fail 
 
 Three workflows run on every PR and push to `main`:
 
-- **`ci.yml` — Pull request checks:** format, lint, and docs-link checks on changed files; `pnpm test` and `pnpm run check-types` only for codemod packages touched by the diff.
+- **`ci.yml` — Pull request checks:** oxfmt / oxlint and docs-link checks on changed files; `pnpm test` and `pnpm run check-types` only for codemod packages touched by the diff.
 - **`ci.yml` — Full workspace (main):** on every push to `main`, runs full `pnpm run ci` (all tests + typechecks) and `pnpm run docs:links`.
 - **`ci.yml` — Changeset check:** enforces that every PR touching `codemods/` includes a changeset for each changed package (or has the `skip-changeset` label).
 
@@ -167,29 +167,29 @@ Keep transformations atomic and verifiable with fixtures.
 
 ## Checks
 
-| Command                  | What it does                        |
-| ------------------------ | ----------------------------------- |
-| `pnpm run format`        | Auto-format with Biome              |
-| `pnpm run format:check`  | Check formatting (no writes)        |
-| `pnpm run lint`          | Lint with Biome                     |
-| `pnpm run lint:fix`      | Lint and auto-fix with Biome        |
-| `pnpm run test`          | Run all codemod tests               |
-| `pnpm run check-types`   | Typecheck all codemod packages      |
-| `pnpm run ci`            | Full check (test + typecheck)       |
+| Command                 | What it does                   |
+| ----------------------- | ------------------------------ |
+| `pnpm run format`       | Auto-format with oxfmt         |
+| `pnpm run format:check` | Check formatting (no writes)   |
+| `pnpm run lint`         | Lint with oxlint (type-aware)  |
+| `pnpm run lint:fix`     | Lint and auto-fix with oxlint  |
+| `pnpm run test`         | Run all codemod tests          |
+| `pnpm run check-types`  | Typecheck all codemod packages |
+| `pnpm run ci`           | Full check (test + typecheck)  |
 
 ## Pull requests
 
 - Describe the codemod and its migration use case.
 - Follow [Conventional Commits](https://www.conventionalcommits.org/):
 
-| Type       | Usage                                  |
-| ---------- | -------------------------------------- |
-| `feat`     | New codemod or capability              |
-| `fix`      | Bugfix in a transform or test          |
-| `docs`     | Documentation-only changes             |
-| `refactor` | Non-feature, non-bugfix code changes   |
-| `test`     | Add or update fixtures/tests           |
-| `chore`    | Tooling, CI, formatting, repo hygiene  |
+| Type       | Usage                                 |
+| ---------- | ------------------------------------- |
+| `feat`     | New codemod or capability             |
+| `fix`      | Bugfix in a transform or test         |
+| `docs`     | Documentation-only changes            |
+| `refactor` | Non-feature, non-bugfix code changes  |
+| `test`     | Add or update fixtures/tests          |
+| `chore`    | Tooling, CI, formatting, repo hygiene |
 
 ## License
 

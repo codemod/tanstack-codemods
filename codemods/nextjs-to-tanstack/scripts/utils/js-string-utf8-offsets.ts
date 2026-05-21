@@ -6,12 +6,14 @@
  */
 
 export function utf8ByteOffsetToUtf16Index(source: string, byteOffset: number): number {
-  if (byteOffset <= 0) return 0;
-  const utf8 = new TextEncoder().encode(source);
-  const b = Math.min(byteOffset, utf8.length);
-  return new TextDecoder("utf-8").decode(utf8.subarray(0, b)).length;
+  if (byteOffset <= 0) {
+    return 0
+  }
+  const utf8 = new TextEncoder().encode(source)
+  const b = Math.min(byteOffset, utf8.length)
+  return new TextDecoder('utf-8').decode(utf8.subarray(0, b)).length
 }
 
 export function utf16IndexToUtf8ByteOffset(source: string, utf16Index: number): number {
-  return new TextEncoder().encode(source.slice(0, utf16Index)).length;
+  return new TextEncoder().encode(source.slice(0, utf16Index)).length
 }

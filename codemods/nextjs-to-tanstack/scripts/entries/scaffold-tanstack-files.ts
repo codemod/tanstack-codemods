@@ -19,21 +19,23 @@
  * the transform returns `null`.
  */
 
-import type { Codemod } from "codemod:ast-grep";
-import type JSON_TYPES from "codemod:ast-grep/langs/json";
-import { mkdirSync, readFileSync, writeFileSync } from "fs";
-import { dirname, join } from "path";
-import { hasSrcAppOrPages } from "../utils/has-src-app-or-pages.ts";
-import { emitWorkflowStepReport, WORKFLOW_NODE_IDS } from "../utils/migration-run-report.ts";
-import { getFilename, normalizePath } from "../utils/paths.ts";
-import { readNextI18nConfig } from "../utils/read-next-i18n-config.ts";
-import { writeI18nBootstrapIfAbsent } from "../utils/write-i18n-bootstrap.ts";
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+
+import type { Codemod } from 'codemod:ast-grep'
+import type JSON_TYPES from 'codemod:ast-grep/langs/json'
+
+import { hasSrcAppOrPages } from '../utils/has-src-app-or-pages.ts'
+import { emitWorkflowStepReport, WORKFLOW_NODE_IDS } from '../utils/migration-run-report.ts'
+import { getFilename, normalizePath } from '../utils/paths.ts'
+import { readNextI18nConfig } from '../utils/read-next-i18n-config.ts'
+import { writeI18nBootstrapIfAbsent } from '../utils/write-i18n-bootstrap.ts'
 
 /** Local type only — do not name `PackageJson` (merges with patch-package-json.ts in the toolchain). */
-type NextPackageManifest = {
-  dependencies?: Record<string, string>;
-  devDependencies?: Record<string, string>;
-};
+interface NextPackageManifest {
+  dependencies?: Record<string, string>
+  devDependencies?: Record<string, string>
+}
 
 const ROUTER_FILE = `import { createRouter } from '@tanstack/react-router'
 import { routeTree } from './routeTree.gen'
@@ -46,7 +48,7 @@ export function getRouter() {
 
   return router
 }
-`;
+`
 
 /** Satisfies tsserver before the first Vite run; TanStack overwrites this during dev/build. */
 const QUERY_CLIENT_SRC = `import { QueryClient } from '@tanstack/react-query'
@@ -64,7 +66,7 @@ export const queryClient = new QueryClient({
     },
   },
 })
-`;
+`
 
 const ROUTE_TREE_GEN_STUB = `/**
  * Placeholder for TypeScript until \`vite dev\` or \`vite build\` runs.
@@ -73,10 +75,10 @@ const ROUTE_TREE_GEN_STUB = `/**
 import type { AnyRoute } from '@tanstack/react-router'
 
 export const routeTree = null as unknown as AnyRoute
-`;
+`
 
 /** R1 defaults to \`./globals.css?url\` when the root layout had no CSS import — ensure the file exists. */
-const DEFAULT_GLOBALS_CSS = `@import "tailwindcss";\n`;
+const DEFAULT_GLOBALS_CSS = `@import "tailwindcss";\n`
 
 const VITE_CONFIG_SRC_APP = `import { defineConfig } from 'vite'
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
@@ -103,7 +105,7 @@ export default defineConfig({
     nitro(),
   ],
 })
-`;
+`
 
 const VITE_CONFIG_ROOT_APP = `import { defineConfig } from 'vite'
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
@@ -130,67 +132,58 @@ export default defineConfig({
     nitro(),
   ],
 })
-`;
+`
 
 const codemod: Codemod<JSON_TYPES> = async (root) => {
-  const file = getFilename(root);
-  if (!file.endsWith("/package.json") && !file.endsWith("package.json")) {
-    return null;
+  const file = getFilename(root)
+  if (!file.endsWith('/package.json') && !file.endsWith('package.json')) {
+    return null
   }
 
-  const repoRoot = dirname(file);
-  let pkg: NextPackageManifest;
+  const repoRoot = dirname(file)
+  let pkg: NextPackageManifest
   try {
-    pkg = JSON.parse(root.root().text()) as NextPackageManifest;
+    pkg = JSON.parse(root.root().text()) as NextPackageManifest
   } catch {
-    return null;
+    return null
   }
-  const hasNext = Boolean(pkg.dependencies?.next ?? pkg.devDependencies?.next);
+  const hasNext = Boolean(pkg.dependencies?.next ?? pkg.devDependencies?.next)
   if (!hasNext) {
-    return null;
+    return null
   }
 
-  const useSrcApp = hasSrcAppOrPages(repoRoot);
+  const useSrcApp = hasSrcAppOrPages(repoRoot)
 
-  writeIfAbsent(
-    join(repoRoot, "vite.config.ts"),
-    useSrcApp ? VITE_CONFIG_SRC_APP : VITE_CONFIG_ROOT_APP
-  );
-  const routerPath = useSrcApp ? join(repoRoot, "src", "router.tsx") : join(repoRoot, "router.tsx");
-  writeIfAbsent(routerPath, ROUTER_FILE);
-  const routeGenPath = useSrcApp
-    ? join(repoRoot, "src", "routeTree.gen.ts")
-    : join(repoRoot, "routeTree.gen.ts");
-  writeIfAbsent(routeGenPath, ROUTE_TREE_GEN_STUB);
+  writeIfAbsent(join(repoRoot, 'vite.config.ts'), useSrcApp ? VITE_CONFIG_SRC_APP : VITE_CONFIG_ROOT_APP)
+  const routerPath = useSrcApp ? join(repoRoot, 'src', 'router.tsx') : join(repoRoot, 'router.tsx')
+  writeIfAbsent(routerPath, ROUTER_FILE)
+  const routeGenPath = useSrcApp ? join(repoRoot, 'src', 'routeTree.gen.ts') : join(repoRoot, 'routeTree.gen.ts')
+  writeIfAbsent(routeGenPath, ROUTE_TREE_GEN_STUB)
 
-  const queryClientPath = useSrcApp
-    ? join(repoRoot, "src", "query-client.ts")
-    : join(repoRoot, "query-client.ts");
-  writeIfAbsent(queryClientPath, QUERY_CLIENT_SRC);
+  const queryClientPath = useSrcApp ? join(repoRoot, 'src', 'query-client.ts') : join(repoRoot, 'query-client.ts')
+  writeIfAbsent(queryClientPath, QUERY_CLIENT_SRC)
 
-  const globalsCssPath = useSrcApp
-    ? join(repoRoot, "src", "app", "globals.css")
-    : join(repoRoot, "app", "globals.css");
-  writeIfAbsent(globalsCssPath, DEFAULT_GLOBALS_CSS);
+  const globalsCssPath = useSrcApp ? join(repoRoot, 'src', 'app', 'globals.css') : join(repoRoot, 'app', 'globals.css')
+  writeIfAbsent(globalsCssPath, DEFAULT_GLOBALS_CSS)
 
-  const i18n = readNextI18nConfig(repoRoot);
+  const i18n = readNextI18nConfig(repoRoot)
   if (i18n) {
-    const codemodDir = join(repoRoot, ".codemod");
-    mkdirSync(codemodDir, { recursive: true });
+    const codemodDir = join(repoRoot, '.codemod')
+    mkdirSync(codemodDir, { recursive: true })
     writeFileSync(
-      join(codemodDir, "i18n.json"),
+      join(codemodDir, 'i18n.json'),
       `${JSON.stringify(
         {
-          source: "next-i18n",
+          source: 'next-i18n',
           defaultLocale: i18n.defaultLocale,
           locales: i18n.locales,
-          tanstackOptionalLocaleSegment: "{-$locale}",
+          tanstackOptionalLocaleSegment: '{-$locale}',
         },
         null,
-        2
-      )}\n`
-    );
-    writeI18nBootstrapIfAbsent(repoRoot, i18n, useSrcApp);
+        2,
+      )}\n`,
+    )
+    writeI18nBootstrapIfAbsent(repoRoot, i18n, useSrcApp)
   }
 
   emitWorkflowStepReport({
@@ -198,20 +191,20 @@ const codemod: Codemod<JSON_TYPES> = async (root) => {
     packageRoot: normalizePath(repoRoot),
     usedSrcLayout: useSrcApp,
     i18nFromNextConfig: i18n ? { defaultLocale: i18n.defaultLocale, locales: i18n.locales } : null,
-  });
+  })
 
-  return null;
-};
+  return null
+}
 
-export default codemod;
+export default codemod
 
 function writeIfAbsent(path: string, content: string): void {
   try {
-    readFileSync(path);
-    return; // Already exists.
+    readFileSync(path)
+    return // Already exists.
   } catch {
     // Continue to write.
   }
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, content);
+  mkdirSync(dirname(path), { recursive: true })
+  writeFileSync(path, content)
 }

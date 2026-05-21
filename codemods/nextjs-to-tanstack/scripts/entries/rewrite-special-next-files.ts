@@ -9,159 +9,172 @@
  * - `template.tsx` → review comment only (no direct TanStack analogue)
  */
 
-import type { Codemod, Edit, SgNode } from "codemod:ast-grep";
-import type TSX from "codemod:ast-grep/langs/tsx";
-import { addImport } from "../utils/imports.ts";
-import { ensureParentDir, pruneEmptyAncestorsAfterRename } from "../utils/ensure-parent-dir.ts";
-import {
-  getAppRelativePath,
-  getFilename,
-  inferCodemodTargetDir,
-  resolveRenameTarget,
-} from "../utils/paths.ts";
-import {
-  classifySpecialRouteFileBasename,
-  computeSpecialRouteFileTransform,
-} from "../utils/route-path.ts";
-import { applyOptionalLocaleToSpecialRouteFile } from "../utils/i18n-optional-locale-path.ts";
-import { readResolvedI18nConfig } from "../utils/read-next-i18n-config.ts";
-import { hasReviewSentinel, insertReviewBefore } from "../utils/sentinels.ts";
-import { rewriteRelativeImportsAfterFileMove } from "../utils/rewrite-relative-imports-after-move.ts";
+import type { Codemod, Edit, SgNode } from 'codemod:ast-grep'
+import type TSX from 'codemod:ast-grep/langs/tsx'
 
-const TANSTACK_ROUTER = "@tanstack/react-router";
-const TEMPLATE_RE = /^template\.(t|j)sx?$/;
+import { ensureParentDir, pruneEmptyAncestorsAfterRename } from '../utils/ensure-parent-dir.ts'
+import { applyOptionalLocaleToSpecialRouteFile } from '../utils/i18n-optional-locale-path.ts'
+import { addImport } from '../utils/imports.ts'
+import { getAppRelativePath, getFilename, inferCodemodTargetDir, resolveRenameTarget } from '../utils/paths.ts'
+import { readResolvedI18nConfig } from '../utils/read-next-i18n-config.ts'
+import { rewriteRelativeImportsAfterFileMove } from '../utils/rewrite-relative-imports-after-move.ts'
+import { classifySpecialRouteFileBasename, computeSpecialRouteFileTransform } from '../utils/route-path.ts'
+import { hasReviewSentinel, insertReviewBefore } from '../utils/sentinels.ts'
+
+const TANSTACK_ROUTER = '@tanstack/react-router'
+const TEMPLATE_RE = /^template\.(t|j)sx?$/
 
 const codemod: Codemod<TSX> = async (root) => {
-  const relative = getAppRelativePath(root);
-  const base = relative.split("/").at(-1) ?? relative;
+  const relative = getAppRelativePath(root)
+  const base = relative.split('/').at(-1) ?? relative
 
   if (TEMPLATE_RE.test(base)) {
-    return annotateTemplate(root);
+    return annotateTemplate(root)
   }
 
-  if (!classifySpecialRouteFileBasename(base)) return null;
+  if (!classifySpecialRouteFileBasename(base)) {
+    return null
+  }
 
-  let routeInfo = computeSpecialRouteFileTransform(relative);
-  if (!routeInfo) return null;
+  let routeInfo = computeSpecialRouteFileTransform(relative)
+  if (!routeInfo) {
+    return null
+  }
 
-  const pkgRoot = inferCodemodTargetDir(getFilename(root));
-  const i18nCfg = readResolvedI18nConfig(pkgRoot);
+  const pkgRoot = inferCodemodTargetDir(getFilename(root))
+  const i18nCfg = readResolvedI18nConfig(pkgRoot)
   if (i18nCfg) {
-    routeInfo = applyOptionalLocaleToSpecialRouteFile(routeInfo);
+    routeInfo = applyOptionalLocaleToSpecialRouteFile(routeInfo)
   }
 
-  const rootNode = root.root();
+  const rootNode = root.root()
 
   const alreadyMigrated = rootNode.find({
     rule: {
-      kind: "call_expression",
+      kind: 'call_expression',
       has: {
-        field: "function",
-        kind: "identifier",
-        regex: "^createFileRoute$",
+        field: 'function',
+        kind: 'identifier',
+        regex: '^createFileRoute$',
       },
     },
-  });
-  if (alreadyMigrated) return null;
+  })
+  if (alreadyMigrated) {
+    return null
+  }
 
-  const defaultExport = findDefaultExport(rootNode);
-  if (!defaultExport) return null;
+  const defaultExport = findDefaultExport(rootNode)
+  if (!defaultExport) {
+    return null
+  }
 
-  const fn = firstChildOfKind(defaultExport, "function_declaration");
-  if (!fn) return null;
+  const fn = firstChildOfKind(defaultExport, 'function_declaration')
+  if (!fn) {
+    return null
+  }
 
-  const fnName = fn.field("name")?.text();
-  if (!fnName) return null;
+  const fnName = fn.field('name')?.text()
+  if (!fnName) {
+    return null
+  }
 
-  const edits: Edit[] = [];
-  const source = rootNode.text();
-  const hasAnyImport = rootNode.find({ rule: { kind: "import_statement" } }) !== null;
+  const edits: Edit[] = []
+  const source = rootNode.text()
+  const hasAnyImport = rootNode.find({ rule: { kind: 'import_statement' } }) !== null
 
-  const exportStart = defaultExport.range().start.index;
-  const fnStart = fn.range().start.index;
-  const fnEnd = fn.range().end.index;
-  const routeBlock = buildSpecialRouteBlock(
-    routeInfo.routePath,
-    fnName,
-    routeInfo.routeOptionProperty
-  );
+  const exportStart = defaultExport.range().start.index
+  const fnStart = fn.range().start.index
+  const fnEnd = fn.range().end.index
+  const routeBlock = buildSpecialRouteBlock(routeInfo.routePath, fnName, routeInfo.routeOptionProperty)
 
   if (!hasAnyImport) {
     edits.push({
       startPos: exportStart,
       endPos: fnEnd,
       insertedText: `import { createFileRoute } from "${TANSTACK_ROUTER}";\n\n${source.slice(fnStart, fnEnd)}\n\n${routeBlock}`,
-    });
+    })
   } else {
     edits.push({
       startPos: exportStart,
       endPos: fnStart,
-      insertedText: "",
-    });
+      insertedText: '',
+    })
     edits.push({
       startPos: fnEnd,
       endPos: fnEnd,
       insertedText: `\n\n${routeBlock}`,
-    });
+    })
     const importEdit = addImport(rootNode, {
-      type: "named",
-      specifiers: [{ name: "createFileRoute" }],
+      type: 'named',
+      specifiers: [{ name: 'createFileRoute' }],
       from: TANSTACK_ROUTER,
-    });
-    if (importEdit) edits.push(importEdit);
+    })
+    if (importEdit) {
+      edits.push(importEdit)
+    }
   }
 
-  const newPath = resolveRenameTarget(root, routeInfo.newPath);
-  ensureParentDir(newPath);
-  const oldAbsPath = getFilename(root);
-  let out = rootNode.commitEdits(edits);
-  out = rewriteRelativeImportsAfterFileMove(out, oldAbsPath, newPath);
-  root.rename(newPath);
-  pruneEmptyAncestorsAfterRename(oldAbsPath);
-  return out;
-};
+  const newPath = resolveRenameTarget(root, routeInfo.newPath)
+  ensureParentDir(newPath)
+  const oldAbsPath = getFilename(root)
+  let out = rootNode.commitEdits(edits)
+  out = rewriteRelativeImportsAfterFileMove(out, oldAbsPath, newPath)
+  root.rename(newPath)
+  pruneEmptyAncestorsAfterRename(oldAbsPath)
+  return out
+}
 
-export default codemod;
+export default codemod
 
 function annotateTemplate(root: Parameters<Codemod<TSX>>[0]): string | null {
-  const relative = getAppRelativePath(root);
-  if (/api\//.test(relative)) return null;
+  const relative = getAppRelativePath(root)
+  if (relative.includes('api/')) {
+    return null
+  }
 
-  const rootNode = root.root();
-  const source = rootNode.text();
-  const firstStmt = rootNode.children()[0];
-  if (!firstStmt) return null;
-  if (hasReviewSentinel(source, firstStmt, "template.tsx")) return null;
+  const rootNode = root.root()
+  const source = rootNode.text()
+  const firstStmt = rootNode.children()[0]
+  if (!firstStmt) {
+    return null
+  }
+  if (hasReviewSentinel(source, firstStmt, 'template.tsx')) {
+    return null
+  }
 
   const edit = insertReviewBefore(
     firstStmt,
-    "Next.js template.tsx has no direct TanStack Start equivalent — refactor manually"
-  );
-  return rootNode.commitEdits([edit]);
+    'Next.js template.tsx has no direct TanStack Start equivalent — refactor manually',
+  )
+  return rootNode.commitEdits([edit])
 }
 
 function buildSpecialRouteBlock(
   routePath: string,
   componentName: string,
-  routeOptionProperty: "pendingComponent" | "errorComponent" | "notFoundComponent"
+  routeOptionProperty: 'pendingComponent' | 'errorComponent' | 'notFoundComponent',
 ): string {
-  return `export const Route = createFileRoute(${JSON.stringify(routePath)})({\n  ${routeOptionProperty}: ${componentName},\n});`;
+  return `export const Route = createFileRoute(${JSON.stringify(routePath)})({\n  ${routeOptionProperty}: ${componentName},\n});`
 }
 
 function findDefaultExport(rootNode: SgNode<TSX>): SgNode<TSX> | null {
   for (const stmt of rootNode.children()) {
-    if (stmt.kind() !== "export_statement") continue;
-    const hasDefault = stmt
-      .children()
-      .some((c) => c.kind() === "default" || c.text() === "default");
-    if (hasDefault) return stmt;
+    if (stmt.kind() !== 'export_statement') {
+      continue
+    }
+    const hasDefault = stmt.children().some((c) => c.kind() === 'default' || c.text() === 'default')
+    if (hasDefault) {
+      return stmt
+    }
   }
-  return null;
+  return null
 }
 
 function firstChildOfKind(parent: SgNode<TSX>, kind: string): SgNode<TSX> | null {
   for (const child of parent.children()) {
-    if (child.kind() === kind) return child;
+    if (child.kind() === kind) {
+      return child
+    }
   }
-  return null;
+  return null
 }

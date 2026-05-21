@@ -11,33 +11,38 @@
  * materialize paths when applying edits and renames.
  */
 
-import { mkdirSync, readdirSync } from "fs";
-import type { Dirent } from "fs";
-import { basename, dirname, join } from "path";
-import { inferCodemodTargetDir, normalizePath } from "./paths.ts";
-import { safeRemoveFile, safeRmdirIfEmpty } from "./safe-remove.ts";
+import { mkdirSync, readdirSync } from 'node:fs'
+import type { Dirent } from 'node:fs'
+import { basename, dirname, join } from 'node:path'
+
+import { inferCodemodTargetDir, normalizePath } from './paths.ts'
+import { safeRemoveFile, safeRmdirIfEmpty } from './safe-remove.ts'
 
 /** Filenames that should not block deleting an otherwise abandoned Next.js segment dir. */
-const IGNORABLE_APP_DIR_FILES = new Set([".DS_Store", "Thumbs.db", ".gitkeep", ".keep"]);
+const IGNORABLE_APP_DIR_FILES = new Set(['.DS_Store', 'Thumbs.db', '.gitkeep', '.keep'])
 
 export function removeIgnorableFilesystemEntriesInDir(dirAbs: string): void {
-  let names: string[];
+  let names: string[]
   try {
-    names = readdirSync(dirAbs);
+    names = readdirSync(dirAbs)
   } catch {
-    return;
+    return
   }
   for (const name of names) {
-    if (!IGNORABLE_APP_DIR_FILES.has(name)) continue;
-    safeRemoveFile(join(dirAbs, name));
+    if (!IGNORABLE_APP_DIR_FILES.has(name)) {
+      continue
+    }
+    safeRemoveFile(join(dirAbs, name))
   }
 }
 
 export function ensureParentDir(absFilePath: string): void {
-  const dir = dirname(absFilePath);
-  if (dir === "." || dir === "/") return;
+  const dir = dirname(absFilePath)
+  if (dir === '.' || dir === '/') {
+    return
+  }
   try {
-    mkdirSync(dir, { recursive: true });
+    mkdirSync(dir, { recursive: true })
   } catch {
     /* Host applies the rename and may create parents without Node fs in sandbox */
   }
@@ -50,23 +55,31 @@ export function ensureParentDir(absFilePath: string): void {
  */
 export function pruneEmptyAncestorsAfterRename(previousFileAbsolute: string): void {
   try {
-    const pkgRoot = normalizePath(inferCodemodTargetDir(previousFileAbsolute));
-    let d = normalizePath(dirname(previousFileAbsolute));
+    const pkgRoot = normalizePath(inferCodemodTargetDir(previousFileAbsolute))
+    let d = normalizePath(dirname(previousFileAbsolute))
 
     for (;;) {
-      if (d === pkgRoot || !d.startsWith(`${pkgRoot}/`)) return;
-
-      try {
-        removeIgnorableFilesystemEntriesInDir(d);
-        if (readdirSync(d).length > 0) return;
-        if (!safeRmdirIfEmpty(d)) return;
-      } catch {
-        return;
+      if (d === pkgRoot || !d.startsWith(`${pkgRoot}/`)) {
+        return
       }
 
-      const parent = normalizePath(dirname(d));
-      if (parent === d) return;
-      d = parent;
+      try {
+        removeIgnorableFilesystemEntriesInDir(d)
+        if (readdirSync(d).length > 0) {
+          return
+        }
+        if (!safeRmdirIfEmpty(d)) {
+          return
+        }
+      } catch {
+        return
+      }
+
+      const parent = normalizePath(dirname(d))
+      if (parent === d) {
+        return
+      }
+      d = parent
     }
   } catch {
     /* No Node fs in some runtimes */
@@ -81,39 +94,51 @@ export function pruneEmptyAncestorsAfterRename(previousFileAbsolute: string): vo
  */
 export function pruneEmptyNextBracketSegmentDirsUnderApp(appAbs: string): void {
   try {
-    const root = normalizePath(appAbs);
+    const root = normalizePath(appAbs)
 
     for (let pass = 0; pass < 32; pass++) {
-      const dirs = collectAllSubdirectories(root);
-      dirs.sort((a, b) => b.length - a.length);
-      let removedAny = false;
+      const dirs = collectAllSubdirectories(root)
+      dirs.sort((a, b) => b.length - a.length)
+      let removedAny = false
       for (const d of dirs) {
-        if (!isNextDynamicRouteSegmentFolder(basename(d))) continue;
-        removeIgnorableFilesystemEntriesInDir(d);
+        if (!isNextDynamicRouteSegmentFolder(basename(d))) {
+          continue
+        }
+        removeIgnorableFilesystemEntriesInDir(d)
         try {
-          if (readdirSync(d).length === 0 && safeRmdirIfEmpty(d)) removedAny = true;
+          if (readdirSync(d).length === 0 && safeRmdirIfEmpty(d)) {
+            removedAny = true
+          }
         } catch {
           /* */
         }
       }
-      if (!removedAny) break;
+      if (!removedAny) {
+        break
+      }
     }
 
     // e.g. `app/posts/` left empty after `page.tsx` → `posts.tsx` and `[slug]` removed
     for (let pass = 0; pass < 32; pass++) {
-      const dirs = collectAllSubdirectories(root);
-      dirs.sort((a, b) => b.length - a.length);
-      let removedAny = false;
+      const dirs = collectAllSubdirectories(root)
+      dirs.sort((a, b) => b.length - a.length)
+      let removedAny = false
       for (const d of dirs) {
-        if (normalizePath(d) === root) continue;
-        removeIgnorableFilesystemEntriesInDir(d);
+        if (normalizePath(d) === root) {
+          continue
+        }
+        removeIgnorableFilesystemEntriesInDir(d)
         try {
-          if (readdirSync(d).length === 0 && safeRmdirIfEmpty(d)) removedAny = true;
+          if (readdirSync(d).length === 0 && safeRmdirIfEmpty(d)) {
+            removedAny = true
+          }
         } catch {
           /* */
         }
       }
-      if (!removedAny) break;
+      if (!removedAny) {
+        break
+      }
     }
   } catch {
     /* sandbox / no fs */
@@ -121,26 +146,30 @@ export function pruneEmptyNextBracketSegmentDirsUnderApp(appAbs: string): void {
 }
 
 function collectAllSubdirectories(root: string): string[] {
-  const dirs: string[] = [];
+  const dirs: string[] = []
   const collect = (dir: string) => {
-    let dirents: Dirent[];
+    let dirents: Dirent[]
     try {
-      dirents = readdirSync(dir, { withFileTypes: true });
+      dirents = readdirSync(dir, { withFileTypes: true })
     } catch {
-      return;
+      return
     }
     for (const e of dirents) {
-      if (!e.isDirectory()) continue;
-      if (e.name === "node_modules") continue;
-      const full = join(dir, e.name);
-      dirs.push(full);
-      collect(full);
+      if (!e.isDirectory()) {
+        continue
+      }
+      if (e.name === 'node_modules') {
+        continue
+      }
+      const full = join(dir, e.name)
+      dirs.push(full)
+      collect(full)
     }
-  };
-  collect(normalizePath(root));
-  return dirs;
+  }
+  collect(normalizePath(root))
+  return dirs
 }
 
 function isNextDynamicRouteSegmentFolder(name: string): boolean {
-  return name.startsWith("[") && name.endsWith("]") && name.length >= 3;
+  return name.startsWith('[') && name.endsWith(']') && name.length >= 3
 }

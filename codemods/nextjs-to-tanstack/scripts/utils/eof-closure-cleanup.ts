@@ -15,5 +15,5 @@
  * merge artifact — deleting it corrupts hooks and helpers (see app `_hooks/*.ts`).
  */
 export function collapseDuplicateTrailingExportClosures(source: string): string {
-  return source.replace(/(\}\s*;)((?:[ \t]*\}\s*;)+)\s*$/, "$1\n");
+  return source.replace(/(\}\s*;)((?:[ \t]*\}\s*;)+)\s*$/, '$1\n')
 }

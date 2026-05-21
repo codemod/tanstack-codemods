@@ -4,35 +4,35 @@
  * parse without enclosing context.
  */
 
-import type { Edit, SgNode } from "codemod:ast-grep";
+import type { Edit, SgNode } from 'codemod:ast-grep'
 
 /**
  * Find every JSX opening element whose tag name exactly equals `tagName`.
  * Returns both self-closing (`<Foo />`) and paired (`<Foo>...</Foo>`) opens.
  */
 export function findJsxOpeningElements(root: SgNode, tagName: string): SgNode[] {
-  const rx = `^${escapeRegex(tagName)}$`;
+  const rx = `^${escapeRegex(tagName)}$`
   return root.findAll({
     rule: {
       any: [
         {
-          kind: "jsx_opening_element",
-          has: { field: "name", kind: "identifier", regex: rx },
+          kind: 'jsx_opening_element',
+          has: { field: 'name', kind: 'identifier', regex: rx },
         },
         {
-          kind: "jsx_self_closing_element",
-          has: { field: "name", kind: "identifier", regex: rx },
+          kind: 'jsx_self_closing_element',
+          has: { field: 'name', kind: 'identifier', regex: rx },
         },
       ],
     },
-  });
+  })
 }
 
 /**
  * Collect the list of `jsx_attribute` nodes belonging to the opening element.
  */
 export function jsxAttributes(openEl: SgNode): SgNode[] {
-  return openEl.findAll({ rule: { kind: "jsx_attribute" } });
+  return openEl.findAll({ rule: { kind: 'jsx_attribute' } })
 }
 
 /**
@@ -40,7 +40,7 @@ export function jsxAttributes(openEl: SgNode): SgNode[] {
  * name. Returns null for spread attributes.
  */
 export function jsxAttributeName(attr: SgNode): SgNode | null {
-  return attr.find({ rule: { kind: "property_identifier" } });
+  return attr.find({ rule: { kind: 'property_identifier' } })
 }
 
 /**
@@ -48,10 +48,14 @@ export function jsxAttributeName(attr: SgNode): SgNode | null {
  * attribute value node exactly as-is.
  */
 export function renameJsxAttribute(attr: SgNode, newName: string): Edit | null {
-  const name = jsxAttributeName(attr);
-  if (!name) return null;
-  if (name.text() === newName) return null;
-  return name.replace(newName);
+  const name = jsxAttributeName(attr)
+  if (!name) {
+    return null
+  }
+  if (name.text() === newName) {
+    return null
+  }
+  return name.replace(newName)
 }
 
 /**
@@ -59,18 +63,22 @@ export function renameJsxAttribute(attr: SgNode, newName: string): Edit | null {
  * jsx_expression, a template literal, ...).
  */
 export function jsxAttributeValue(attr: SgNode): SgNode | null {
-  const children = attr.children();
+  const children = attr.children()
   // Structure: property_identifier, "=", value
   for (let i = children.length - 1; i >= 0; i--) {
-    const c = children[i];
-    if (!c) continue;
-    const k = c.kind();
-    if (k === "property_identifier" || k === "=") continue;
-    return c;
+    const c = children[i]
+    if (!c) {
+      continue
+    }
+    const k = c.kind()
+    if (k === 'property_identifier' || k === '=') {
+      continue
+    }
+    return c
   }
-  return null;
+  return null
 }
 
 function escapeRegex(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return s.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
