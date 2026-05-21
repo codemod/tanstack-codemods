@@ -38,6 +38,16 @@ jobs:
           files=$(git diff --name-only --diff-filter=ACMR origin/main...HEAD | tr '\n' ' ')
           echo "files=$files" >> "$GITHUB_OUTPUT"
 
+          # Biome only formats/lints JS/TS/JSON — skip .md, .yaml, .sh, etc.
+          biome_files=""
+          for f in $(git diff --name-only --diff-filter=ACMR origin/main...HEAD); do
+            case "$f" in
+              *.ts|*.tsx|*.js|*.jsx|*.json|*.jsonc) biome_files="${biome_files} ${f}" ;;
+            esac
+          done
+          biome_files=$(echo "$biome_files" | xargs)
+          echo "biome_files=$biome_files" >> "$GITHUB_OUTPUT"
+
       - name: Get changed codemod package dirs
         id: codemods
         run: |
@@ -59,12 +69,12 @@ jobs:
           echo "dirs=$dirs" >> "$GITHUB_OUTPUT"
 
       - name: Format check (changed files)
-        if: steps.changed.outputs.files != ''
-        run: pnpm exec biome format ${{ steps.changed.outputs.files }}
+        if: steps.changed.outputs.biome_files != ''
+        run: pnpm exec biome format ${{ steps.changed.outputs.biome_files }}
 
       - name: Lint (changed files)
-        if: steps.changed.outputs.files != ''
-        run: pnpm exec biome lint ${{ steps.changed.outputs.files }}
+        if: steps.changed.outputs.biome_files != ''
+        run: pnpm exec biome lint ${{ steps.changed.outputs.biome_files }}
 
       - name: Markdown link check
         run: pnpm run docs:links

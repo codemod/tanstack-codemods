@@ -21,6 +21,8 @@ npx codemod@latest workflow run --workflow workflow.yaml --target .
 
 Back up or commit first (recommended). Many files change; unmigrated `pages/` files may end up under `migrated-from-pages/`.
 
+The registry package name is `nextjs-to-tanstack` (same as in `codemod.yaml`).
+
 ---
 
 ## Workflow params
