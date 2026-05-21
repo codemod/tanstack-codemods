@@ -18,12 +18,7 @@ import { inferCodemodTargetDir, normalizePath } from "./paths.ts";
 import { safeRemoveFile, safeRmdirIfEmpty } from "./safe-remove.ts";
 
 /** Filenames that should not block deleting an otherwise abandoned Next.js segment dir. */
-const IGNORABLE_APP_DIR_FILES = new Set([
-  ".DS_Store",
-  "Thumbs.db",
-  ".gitkeep",
-  ".keep",
-]);
+const IGNORABLE_APP_DIR_FILES = new Set([".DS_Store", "Thumbs.db", ".gitkeep", ".keep"]);
 
 export function removeIgnorableFilesystemEntriesInDir(dirAbs: string): void {
   let names: string[];

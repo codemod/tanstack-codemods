@@ -22,7 +22,12 @@ import {
   type RoutePathResult,
 } from "../utils/route-path.ts";
 import { ensureParentDir, pruneEmptyAncestorsAfterRename } from "../utils/ensure-parent-dir.ts";
-import { getAppRelativePath, getFilename, inferCodemodTargetDir, resolveRenameTarget } from "../utils/paths.ts";
+import {
+  getAppRelativePath,
+  getFilename,
+  inferCodemodTargetDir,
+  resolveRenameTarget,
+} from "../utils/paths.ts";
 import { applyOptionalLocaleToRoutePathResult } from "../utils/i18n-optional-locale-path.ts";
 import { readResolvedI18nConfig } from "../utils/read-next-i18n-config.ts";
 import { insertTodoBefore } from "../utils/sentinels.ts";
@@ -115,10 +120,7 @@ const codemod: Codemod<TSX> = async (root) => {
     edits.push({
       startPos: exportStart,
       endPos: fnEnd,
-      insertedText:
-        `import { createFileRoute } from "${TANSTACK_ROUTER}";\n\n` +
-        source.slice(fnStart, fnEnd) +
-        `\n\n${routeBlock}`,
+      insertedText: `import { createFileRoute } from "${TANSTACK_ROUTER}";\n\n${source.slice(fnStart, fnEnd)}\n\n${routeBlock}`,
     });
   } else {
     edits.push({
@@ -157,10 +159,11 @@ function wrapIdentifierExport(
   rootNode: SgNode<TSX>,
   defaultExport: SgNode<TSX>,
   identifier: SgNode<TSX>,
-  routeInfo: RoutePathResult,
+  routeInfo: RoutePathResult
 ): string {
   const name = identifier.text();
-  const routePath = routeInfo.routePath!;
+  const routePath = routeInfo.routePath;
+  if (routePath === null) return rootNode.text();
   const block = buildRouteBlock(routePath, name);
   const edits: Edit[] = [];
 
@@ -198,17 +201,15 @@ function wrapIdentifierExport(
 }
 
 function buildRouteBlock(routePath: string, componentName: string): string {
-  return (
-    `export const Route = createFileRoute(${JSON.stringify(routePath)})({\n` +
-    `  component: ${componentName},\n` +
-    `});`
-  );
+  return `export const Route = createFileRoute(${JSON.stringify(routePath)})({\n  component: ${componentName},\n});`;
 }
 
 function findDefaultExport(rootNode: SgNode<TSX>): SgNode<TSX> | null {
   for (const stmt of rootNode.children()) {
     if (stmt.kind() !== "export_statement") continue;
-    const hasDefault = stmt.children().some((c) => c.kind() === "default" || c.text() === "default");
+    const hasDefault = stmt
+      .children()
+      .some((c) => c.kind() === "default" || c.text() === "default");
     if (hasDefault) return stmt;
   }
   return null;
@@ -234,36 +235,23 @@ function emitTodo(rootNode: SgNode<TSX>, nearNode?: SgNode<TSX>): string {
   const edit = insertTodoBefore(
     target,
     "page shape was not rewritten — wrap the default export with createFileRoute manually",
-    PAGES_DOC,
+    PAGES_DOC
   );
   return rootNode.commitEdits([edit]);
 }
 
-function buildOptionalCatchAllIndexSource(
-  indexRoutePath: string,
-  splatRoutePath: string,
-): string {
-  return (
-    `import { createFileRoute, redirect } from "${TANSTACK_ROUTER}";\n\n` +
-    `export const Route = createFileRoute(${JSON.stringify(indexRoutePath)})({\n` +
-    `  beforeLoad: () => {\n` +
-    `    throw redirect({\n` +
-    `      to: ${JSON.stringify(splatRoutePath)},\n` +
-    `      params: { _splat: "" },\n` +
-    `    });\n` +
-    `  },\n` +
-    `});\n`
-  );
+function buildOptionalCatchAllIndexSource(indexRoutePath: string, splatRoutePath: string): string {
+  return `import { createFileRoute, redirect } from "${TANSTACK_ROUTER}";\n\nexport const Route = createFileRoute(${JSON.stringify(indexRoutePath)})({\n  beforeLoad: () => {\n    throw redirect({\n      to: ${JSON.stringify(splatRoutePath)},\n      params: { _splat: "" },\n    });\n  },\n});\n`;
 }
 
 function writeOptionalCatchAllIndex(
   root: Parameters<Codemod<TSX>>[0],
-  redirectMeta: RoutePathResult["optionalCatchAllRedirect"],
+  redirectMeta: RoutePathResult["optionalCatchAllRedirect"]
 ): void {
   if (!redirectMeta) return;
   const source = buildOptionalCatchAllIndexSource(
     redirectMeta.indexRoutePath,
-    redirectMeta.splatRoutePath,
+    redirectMeta.splatRoutePath
   );
   const abs = resolveRenameTarget(root, redirectMeta.indexNewPath);
   ensureParentDir(abs);

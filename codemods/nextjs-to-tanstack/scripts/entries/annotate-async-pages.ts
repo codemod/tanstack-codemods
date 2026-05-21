@@ -26,10 +26,12 @@ import {
   objectLiteralNeedsCommaAfterLastProperty,
   objectLiteralOpenBraceIndex,
 } from "../utils/tsx-object-literal.ts";
-import { utf16IndexToUtf8ByteOffset, utf8ByteOffsetToUtf16Index } from "../utils/js-string-utf8-offsets.ts";
+import {
+  utf16IndexToUtf8ByteOffset,
+  utf8ByteOffsetToUtf16Index,
+} from "../utils/js-string-utf8-offsets.ts";
 
-const LOADER_DOC =
-  "https://tanstack.com/router/latest/docs/framework/react/guide/data-loading";
+const LOADER_DOC = "https://tanstack.com/router/latest/docs/framework/react/guide/data-loading";
 
 const TODO_NEEDLE = "Route.loader";
 
@@ -75,8 +77,8 @@ const codemod: Codemod<TSX> = async (root) => {
             fn,
             `move async data fetching into ${TODO_NEEDLE} (or a server function); avoid heavy awaits in route components`,
             LOADER_DOC,
-            " - ",
-          ),
+            " - "
+          )
         );
       }
       continue;
@@ -98,8 +100,8 @@ const codemod: Codemod<TSX> = async (root) => {
         fn,
         `move async data fetching into ${TODO_NEEDLE} (or a server function); avoid heavy awaits in route components`,
         LOADER_DOC,
-        " - ",
-      ),
+        " - "
+      )
     );
   }
 
@@ -194,7 +196,7 @@ function collectCreateFileRouteConfigObjects(rootNode: SgNode<TSX>): SgNode<TSX>
  */
 function stripStandaloneCommaLineBeforeLoaderEdit(
   source: string,
-  configObj: SgNode<TSX>,
+  configObj: SgNode<TSX>
 ): Edit | null {
   if (!getObjectPairValue(configObj, "loader")) return null;
   const re =
@@ -212,7 +214,7 @@ function stripStandaloneCommaLineBeforeLoaderEdit(
 
 function resolveAsyncComponentFunction(
   rootNode: SgNode<TSX>,
-  value: SgNode<TSX>,
+  value: SgNode<TSX>
 ): SgNode<TSX> | null {
   if (value.kind() === "identifier") {
     const fn = findFunctionDeclaration(rootNode, value.text());
@@ -289,10 +291,7 @@ function functionBodyUsesTopLevelAwait(fn: SgNode<TSX>): boolean {
   return false;
 }
 
-function awaitDepthWithinAsyncBoundary(
-  node: SgNode<TSX>,
-  stopAncestor: SgNode<TSX>,
-): number {
+function awaitDepthWithinAsyncBoundary(node: SgNode<TSX>, stopAncestor: SgNode<TSX>): number {
   let depth = 0;
   let cur: SgNode<TSX> | null = node.parent();
   while (cur && cur.id() !== stopAncestor.id()) {
@@ -315,10 +314,7 @@ function awaitDepthWithinAsyncBoundary(
  * still apply loader extraction.
  */
 function removePriorRouteLoaderTodoEdit(source: string, fn: SgNode<TSX>): Edit | null {
-  let lineStart = findLineStart(
-    source,
-    utf8ByteOffsetToUtf16Index(source, fn.range().start.index),
-  );
+  let lineStart = findLineStart(source, utf8ByteOffsetToUtf16Index(source, fn.range().start.index));
   for (let depth = 0; depth < 10; depth++) {
     const above = lineRangeAbove(source, lineStart);
     if (!above) return null;
@@ -349,7 +345,7 @@ function findLineStart(source: string, idx: number): number {
 /** The line strictly above the line that starts at `currentLineStart`. */
 function lineRangeAbove(
   source: string,
-  currentLineStart: number,
+  currentLineStart: number
 ): { ls: number; lineEnd: number } | null {
   if (currentLineStart === 0) return null;
   const prevEnd = currentLineStart - 1;
@@ -363,7 +359,7 @@ function lineRangeAbove(
 function tryBuildLoaderMigrationEdits(
   source: string,
   fn: SgNode<TSX>,
-  configObj: SgNode<TSX>,
+  configObj: SgNode<TSX>
 ): Edit[] | null {
   const body = fn.field("body");
   if (!body || body.kind() !== "statement_block") return null;
@@ -390,10 +386,7 @@ function tryBuildLoaderMigrationEdits(
   }
 
   const declared = collectDeclaredNames(loaderStmts);
-  if (
-    declared.length === 0 &&
-    !loaderBlockHasTopLevelAwait(loaderStmts, fn)
-  ) {
+  if (declared.length === 0 && !loaderBlockHasTopLevelAwait(loaderStmts, fn)) {
     return null;
   }
 
@@ -414,7 +407,7 @@ function tryBuildLoaderMigrationEdits(
     exportKeys.length === 0
       ? "return {};"
       : exportKeys.length === 1
-        ? `return ${exportKeys[0]!};`
+        ? `return ${exportKeys[0] ?? ""};`
         : `return { ${exportKeys.join(", ")} };`;
 
   const loaderBodyLines = loaderStmts.map((s: SgNode<TSX>) => s.text().trimEnd());
@@ -445,15 +438,15 @@ function tryBuildLoaderMigrationEdits(
     exportKeys.length === 0
       ? ""
       : exportKeys.length === 1
-        ? `const ${exportKeys[0]!} = Route.useLoaderData();`
+        ? `const ${exportKeys[0] ?? ""} = Route.useLoaderData();`
         : `const { ${exportKeys.join(", ")} } = Route.useLoaderData();`;
 
-  const loader0 = utf8ByteOffsetToUtf16Index(source, loaderStmts[0]!.range().start.index);
+  const firstLoader = loaderStmts[0];
+  const lastLoader = loaderStmts[loaderStmts.length - 1];
+  if (firstLoader === undefined || lastLoader === undefined) return null;
+  const loader0 = utf8ByteOffsetToUtf16Index(source, firstLoader.range().start.index);
   const leadingStart = source.lastIndexOf("\n", loader0 - 1) + 1;
-  let leadingEnd = utf8ByteOffsetToUtf16Index(
-    source,
-    loaderStmts[loaderStmts.length - 1]!.range().end.index,
-  );
+  let leadingEnd = utf8ByteOffsetToUtf16Index(source, lastLoader.range().end.index);
   if (source.slice(leadingEnd, leadingEnd + 2) === "\r\n") leadingEnd += 2;
   else if (source[leadingEnd] === "\n") leadingEnd += 1;
   leadingEnd = Math.min(leadingEnd, utf8ByteOffsetToUtf16Index(source, ret.range().start.index));
@@ -462,9 +455,7 @@ function tryBuildLoaderMigrationEdits(
 
   const edits: Edit[] = [];
 
-  const loaderInsert =
-    (needsComma ? "," : "") +
-    `\n${pairIndent}loader: async () => {\n${loaderIndented}\n${pairIndent}},\n`;
+  const loaderInsert = `${needsComma ? "," : ""}\n${pairIndent}loader: async () => {\n${loaderIndented}\n${pairIndent}},\n`;
   edits.push({
     startPos: utf16IndexToUtf8ByteOffset(source, closeBrace),
     endPos: utf16IndexToUtf8ByteOffset(source, closeBrace),
@@ -536,18 +527,19 @@ const ALLOWED_LOADER_STMT_KINDS = new Set([
 ]);
 
 function splitLoaderBlockBeforeReturn(
-  block: SgNode<TSX>,
+  block: SgNode<TSX>
 ): { loaderStmts: SgNode<TSX>[]; ret: SgNode<TSX> } | null {
   const stmts = statementBlockStatements(block);
   let retIndex = -1;
   for (let i = stmts.length - 1; i >= 0; i--) {
-    if (stmts[i]!.kind() === "return_statement") {
+    if (stmts[i]?.kind() === "return_statement") {
       retIndex = i;
       break;
     }
   }
   if (retIndex === -1) return null;
-  const ret = stmts[retIndex]!;
+  const ret = stmts[retIndex];
+  if (ret === undefined) return null;
   const loaderStmts = stmts.slice(0, retIndex);
   if (loaderStmts.length === 0) return null;
 
@@ -560,10 +552,7 @@ function splitLoaderBlockBeforeReturn(
   return { loaderStmts, ret };
 }
 
-function loaderBlockHasTopLevelAwait(
-  loaderStmts: SgNode<TSX>[],
-  fn: SgNode<TSX>,
-): boolean {
+function loaderBlockHasTopLevelAwait(loaderStmts: SgNode<TSX>[], fn: SgNode<TSX>): boolean {
   for (const s of loaderStmts) {
     for (const aw of s.findAll({ rule: { kind: "await_expression" } })) {
       if (awaitDepthWithinAsyncBoundary(aw, fn) === 0) return true;
@@ -575,13 +564,10 @@ function loaderBlockHasTopLevelAwait(
 function statementContainsJsx(stmt: SgNode<TSX>): boolean {
   const stack: SgNode<TSX>[] = [stmt];
   while (stack.length > 0) {
-    const n = stack.pop()!;
+    const n = stack.pop();
+    if (n === undefined) break;
     const k = n.kind();
-    if (
-      k === "jsx_element" ||
-      k === "jsx_self_closing_element" ||
-      k === "jsx_fragment"
-    ) {
+    if (k === "jsx_element" || k === "jsx_self_closing_element" || k === "jsx_fragment") {
       return true;
     }
     for (const c of n.children()) {
@@ -637,7 +623,7 @@ function collectDeclaredNames(leading: SgNode<TSX>[]): string[] {
  */
 function collectIdentifiersUsedFromOuterBindings(
   node: SgNode<TSX>,
-  outerBindings: Set<string>,
+  outerBindings: Set<string>
 ): Set<string> {
   const used = new Set<string>();
 

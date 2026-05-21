@@ -24,7 +24,7 @@ const LAYOUT_KEYS = new Set([
 ]);
 
 export function viewportObjectToMetaParts<T extends TypesMap>(
-  objTyped: SgNode<T>,
+  objTyped: SgNode<T>
 ): ViewportMetaParts {
   const objNode = objTyped as unknown as AnyNode;
   const metaItems: string[] = [];
@@ -58,9 +58,7 @@ export function viewportObjectToMetaParts<T extends TypesMap>(
   }
 
   const viewportContent = buildViewportContent(layoutPairs, unmapped);
-  metaItems.push(
-    `{ name: "viewport", content: ${JSON.stringify(viewportContent)} }`,
-  );
+  metaItems.push(`{ name: "viewport", content: ${JSON.stringify(viewportContent)} }`);
 
   if (themeColorValue) {
     collectThemeColor(themeColorValue, metaItems, unmapped);
@@ -68,9 +66,7 @@ export function viewportObjectToMetaParts<T extends TypesMap>(
   if (colorSchemeValue) {
     const cs = readStringLiteral(colorSchemeValue);
     if (cs !== null) {
-      metaItems.push(
-        `{ name: "color-scheme", content: ${JSON.stringify(cs)} }`,
-      );
+      metaItems.push(`{ name: "color-scheme", content: ${JSON.stringify(cs)} }`);
     } else {
       unmapped.push("colorScheme (non-literal value)");
     }
@@ -79,10 +75,7 @@ export function viewportObjectToMetaParts<T extends TypesMap>(
   return { metaItems, unmapped };
 }
 
-function buildViewportContent(
-  layoutPairs: Map<string, AnyNode>,
-  unmapped: string[],
-): string {
+function buildViewportContent(layoutPairs: Map<string, AnyNode>, unmapped: string[]): string {
   let width: string | null = null;
   let height: string | null = null;
   let initialScale: number | null = null;
@@ -179,16 +172,10 @@ function buildViewportContent(
   return segments.join(", ");
 }
 
-function collectThemeColor(
-  value: AnyNode,
-  metaItems: string[],
-  unmapped: string[],
-): void {
+function collectThemeColor(value: AnyNode, metaItems: string[], unmapped: string[]): void {
   const single = readStringLiteral(value);
   if (single !== null) {
-    metaItems.push(
-      `{ name: "theme-color", content: ${JSON.stringify(single)} }`,
-    );
+    metaItems.push(`{ name: "theme-color", content: ${JSON.stringify(single)} }`);
     return;
   }
   if (value.is("array")) {
@@ -214,18 +201,13 @@ function collectThemeColor(
   unmapped.push("themeColor (unsupported value)");
 }
 
-function pushThemeColor(
-  metaItems: string[],
-  desc: { color: string; media?: string },
-): void {
+function pushThemeColor(metaItems: string[], desc: { color: string; media?: string }): void {
   if (desc.media != null) {
     metaItems.push(
-      `{ name: "theme-color", content: ${JSON.stringify(desc.color)}, media: ${JSON.stringify(desc.media)} }`,
+      `{ name: "theme-color", content: ${JSON.stringify(desc.color)}, media: ${JSON.stringify(desc.media)} }`
     );
   } else {
-    metaItems.push(
-      `{ name: "theme-color", content: ${JSON.stringify(desc.color)} }`,
-    );
+    metaItems.push(`{ name: "theme-color", content: ${JSON.stringify(desc.color)} }`);
   }
 }
 
@@ -252,7 +234,6 @@ function readThemeColorDescriptor(node: AnyNode): {
       const s = readStringLiteral(val);
       if (s === null) return null;
       media = s;
-      continue;
     }
   }
   if (color === undefined) return null;

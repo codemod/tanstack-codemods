@@ -95,7 +95,7 @@ export function relativeToTargetDir(pathAbs: string, targetDir: string): string 
  */
 export function resolveRenameTarget<T extends TypesMap>(
   root: SgRoot<T>,
-  computedNewPath: string,
+  computedNewPath: string
 ): string {
   const normalized = normalizePath(computedNewPath);
   if (isAbsoluteNormalizedPath(normalized)) {

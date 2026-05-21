@@ -24,10 +24,7 @@ import type JSON_TYPES from "codemod:ast-grep/langs/json";
 import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { hasSrcAppOrPages } from "../utils/has-src-app-or-pages.ts";
-import {
-  emitWorkflowStepReport,
-  WORKFLOW_NODE_IDS,
-} from "../utils/migration-run-report.ts";
+import { emitWorkflowStepReport, WORKFLOW_NODE_IDS } from "../utils/migration-run-report.ts";
 import { getFilename, normalizePath } from "../utils/paths.ts";
 import { readNextI18nConfig } from "../utils/read-next-i18n-config.ts";
 import { writeI18nBootstrapIfAbsent } from "../utils/write-i18n-bootstrap.ts";
@@ -157,11 +154,9 @@ const codemod: Codemod<JSON_TYPES> = async (root) => {
 
   writeIfAbsent(
     join(repoRoot, "vite.config.ts"),
-    useSrcApp ? VITE_CONFIG_SRC_APP : VITE_CONFIG_ROOT_APP,
+    useSrcApp ? VITE_CONFIG_SRC_APP : VITE_CONFIG_ROOT_APP
   );
-  const routerPath = useSrcApp
-    ? join(repoRoot, "src", "router.tsx")
-    : join(repoRoot, "router.tsx");
+  const routerPath = useSrcApp ? join(repoRoot, "src", "router.tsx") : join(repoRoot, "router.tsx");
   writeIfAbsent(routerPath, ROUTER_FILE);
   const routeGenPath = useSrcApp
     ? join(repoRoot, "src", "routeTree.gen.ts")
@@ -192,8 +187,8 @@ const codemod: Codemod<JSON_TYPES> = async (root) => {
           tanstackOptionalLocaleSegment: "{-$locale}",
         },
         null,
-        2,
-      )}\n`,
+        2
+      )}\n`
     );
     writeI18nBootstrapIfAbsent(repoRoot, i18n, useSrcApp);
   }
@@ -202,9 +197,7 @@ const codemod: Codemod<JSON_TYPES> = async (root) => {
     step: WORKFLOW_NODE_IDS.scaffoldTanstackFiles,
     packageRoot: normalizePath(repoRoot),
     usedSrcLayout: useSrcApp,
-    i18nFromNextConfig: i18n
-      ? { defaultLocale: i18n.defaultLocale, locales: i18n.locales }
-      : null,
+    i18nFromNextConfig: i18n ? { defaultLocale: i18n.defaultLocale, locales: i18n.locales } : null,
   });
 
   return null;

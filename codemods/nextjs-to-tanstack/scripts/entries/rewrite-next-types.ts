@@ -15,16 +15,11 @@ import { hasTodoSentinel, insertTodoBefore } from "../utils/sentinels.ts";
 const MODULE_TYPES = "next/types";
 const MODULE_NEXT = "next";
 
-const NEXT_TYPEONLY_SUBPATHS = new Set([
-  "next/app",
-  "next/document",
-  "next/error",
-]);
+const NEXT_TYPEONLY_SUBPATHS = new Set(["next/app", "next/document", "next/error"]);
 
 const R4J_NEEDLE = "next/types erasure (R4j)";
 const R4J_MSG = `\`${R4J_NEEDLE}\`: replace \`any\` with real types (\`Route.useParams\`, \`useLoaderData\`, \`FileRoutesByPath\`, etc.)`;
-const R4J_DOC =
-  "https://tanstack.com/router/latest/docs/framework/react/guide/router-context";
+const R4J_DOC = "https://tanstack.com/router/latest/docs/framework/react/guide/router-context";
 
 const codemod: Codemod<TSX> = async (root) => {
   const rootNode = root.root();
@@ -127,10 +122,7 @@ const codemod: Codemod<TSX> = async (root) => {
 export default codemod;
 
 /** Type nodes erased by `_param` removal — do not rewrite to `any` / TODO. */
-function unusedUnderscoreErasedTypeNodeIds(
-  root: SgNode<TSX>,
-  typeNames: Set<string>,
-): Set<number> {
+function unusedUnderscoreErasedTypeNodeIds(root: SgNode<TSX>, typeNames: Set<string>): Set<number> {
   const out = new Set<number>();
   const fnKinds = ["function_declaration", "function_expression", "arrow_function"] as const;
   for (const fk of fnKinds) {
@@ -144,7 +136,8 @@ function unusedUnderscoreErasedTypeNodeIds(
         }
       }
       if (paramNodes.length !== 1) continue;
-      const p = paramNodes[0]!;
+      const p = paramNodes[0];
+      if (p === undefined) continue;
       const nameId = p.find({ rule: { kind: "identifier" } });
       if (!nameId) continue;
       const name = nameId.text();
@@ -201,7 +194,8 @@ function extractNamedAndDefaultLocals(stmt: SgNode<TSX>): string[] {
   for (const spec of stmt.findAll({ rule: { kind: "import_specifier" } })) {
     const ids = spec.findAll({ rule: { kind: "identifier" } });
     if (ids.length === 0) continue;
-    locals.push(ids.length >= 2 ? ids[1]!.text() : ids[0]!.text());
+    const localName = ids.length >= 2 ? ids[1]?.text() : ids[0]?.text();
+    if (localName !== undefined) locals.push(localName);
   }
   const clause = stmt.find({ rule: { kind: "import_clause" } });
   if (clause) {
@@ -230,7 +224,8 @@ function unusedUnderscoreTypedParamEdits(root: SgNode<TSX>, typeNames: Set<strin
         }
       }
       if (paramNodes.length !== 1) continue;
-      const p = paramNodes[0]!;
+      const p = paramNodes[0];
+      if (p === undefined) continue;
       const nameId = p.find({ rule: { kind: "identifier" } });
       if (!nameId) continue;
       const name = nameId.text();
@@ -254,7 +249,7 @@ function unusedUnderscoreTypedParamEdits(root: SgNode<TSX>, typeNames: Set<strin
 function identifierUsedInNodeOutsideRange(
   scope: SgNode<TSX>,
   name: string,
-  exclude: { start: { index: number }; end: { index: number } },
+  exclude: { start: { index: number }; end: { index: number } }
 ): boolean {
   const rx = `^${escapeRx(name)}$`;
   for (const id of scope.findAll({ rule: { kind: "identifier", regex: rx } })) {

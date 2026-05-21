@@ -43,19 +43,10 @@ function isCompleteApiRouteModule(source: string): boolean {
   return true;
 }
 
-const HTTP_METHODS = new Set([
-  "GET",
-  "POST",
-  "PUT",
-  "PATCH",
-  "DELETE",
-  "OPTIONS",
-  "HEAD",
-]);
+const HTTP_METHODS = new Set(["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"]);
 
 const TANSTACK_ROUTER = "@tanstack/react-router";
-const API_ROUTES_DOC =
-  "https://tanstack.com/start/latest/docs/framework/react/guide/server-routes";
+const API_ROUTES_DOC = "https://tanstack.com/start/latest/docs/framework/react/guide/server-routes";
 
 interface Handler {
   method: string;
@@ -68,13 +59,14 @@ interface Handler {
 function collectNonNextImportsFromSource(source: string): string {
   const parts: string[] = [];
   const re = /\bimport\s+(?:type\s+)?[\s\S]*?\bfrom\s+["']([^"']+)["']\s*;?/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(source)) !== null) {
+  let m: RegExpExecArray | null = re.exec(source);
+  while (m !== null) {
     const mod = m[1] ?? "";
     if (mod === "next" || mod.startsWith("next/")) {
       continue;
     }
     parts.push(m[0].replace(/;?\s*$/, "").trim());
+    m = re.exec(source);
   }
   return parts.join("\n");
 }
@@ -87,7 +79,7 @@ function migrateDefaultExportPagesApiViaFs(
   root: Parameters<Codemod<TSX>>[0],
   routeInfo: NonNullable<ReturnType<typeof computeRoutePath>>,
   isPagesApi: boolean,
-  appApiLeaf: boolean,
+  appApiLeaf: boolean
 ): string | null {
   if (!isPagesApi && !appApiLeaf) {
     return null;
@@ -118,11 +110,7 @@ function migrateDefaultExportPagesApiViaFs(
     return null;
   }
   const hasPathParams = /\$[a-zA-Z0-9_]/.test(routePath);
-  const transformed = transformNextApiDefaultHandlerBody(
-    bodyInner,
-    { hasPathParams },
-    kind,
-  );
+  const transformed = transformNextApiDefaultHandlerBody(bodyInner, { hasPathParams }, kind);
   if (/\bres\./.test(transformed) || /\breq\./.test(transformed)) {
     return null;
   }
@@ -131,28 +119,15 @@ function migrateDefaultExportPagesApiViaFs(
   const usesParams = hasPathParams && /\bparams\./.test(transformed);
   let handlerParams = "()";
   if (usesParams && usesRequest) {
-    handlerParams =
-      "({ request, params }: { request: Request; params: Record<string, string> })";
+    handlerParams = "({ request, params }: { request: Request; params: Record<string, string> })";
   } else if (usesParams) {
     handlerParams = "({ params }: { params: Record<string, string> })";
   } else if (usesRequest) {
     handlerParams = "({ request }: { request: Request })";
   }
   const httpMethod = kind === "POST" ? "POST" : "GET";
-  const asyncKw =
-    kind === "POST" || /\bawait\b/.test(transformed) ? "async " : "";
-  const newFile =
-    (imports ? imports + "\n\n" : "") +
-    `import { createFileRoute } from "@tanstack/react-router";\n\n` +
-    `export const Route = createFileRoute(${JSON.stringify(routePath)})({\n` +
-    `  server: {\n` +
-    `    handlers: {\n` +
-    `      ${httpMethod}: ${asyncKw}${handlerParams} => {\n` +
-    indent(transformed, 8) +
-    `\n      },\n` +
-    `    },\n` +
-    `  },\n` +
-    `});\n`;
+  const asyncKw = kind === "POST" || /\bawait\b/.test(transformed) ? "async " : "";
+  const newFile = `${imports ? `${imports}\n\n` : ""}import { createFileRoute } from "@tanstack/react-router";\n\nexport const Route = createFileRoute(${JSON.stringify(routePath)})({\n  server: {\n    handlers: {\n      ${httpMethod}: ${asyncKw}${handlerParams} => {\n${indent(transformed, 8)}\n      },\n    },\n  },\n});\n`;
   const newPath = resolveRenameTarget(root, routeInfo.newPath);
   ensureParentDir(newPath);
   const oldAbsPath = getFilename(root);
@@ -166,7 +141,7 @@ function rewriteApiRoutesAst(
   _relative: string,
   routeInfo: NonNullable<ReturnType<typeof computeRoutePath>>,
   isPagesApi: boolean,
-  appApiLeaf: boolean,
+  appApiLeaf: boolean
 ): string | null {
   const rootNode = root.root();
   const source0 = rootNode.text();
@@ -188,7 +163,9 @@ function rewriteApiRoutesAst(
   }
 
   const hasAnyImport = rootNode.find({ rule: { kind: "import_statement" } }) !== null;
-  const block = buildRouteBlock(routeInfo.routePath!, handlers, !hasAnyImport);
+  const routePath = routeInfo.routePath;
+  if (!routePath) return null;
+  const block = buildRouteBlock(routePath, handlers, !hasAnyImport);
   const edits: Edit[] = [];
 
   const firstExport = handlers[0]?.exportStmt;
@@ -203,10 +180,7 @@ function rewriteApiRoutesAst(
   for (const handler of handlers) {
     edits.push({
       startPos: handler.exportStmt.range().start.index,
-      endPos: extendToTrailingNewline(
-        rootNode.text(),
-        handler.exportStmt.range().end.index,
-      ),
+      endPos: extendToTrailingNewline(rootNode.text(), handler.exportStmt.range().end.index),
       insertedText: "",
     });
   }
@@ -233,8 +207,7 @@ function rewriteApiRoutesAst(
 
 const codemod: Codemod<TSX> = async (root) => {
   const relative = getAppRelativePath(root);
-  const isPagesApi =
-    Boolean(stripPagesPrefix(relative)) && relative.includes("/pages/api/");
+  const isPagesApi = Boolean(stripPagesPrefix(relative)) && relative.includes("/pages/api/");
   const appApiLeaf = isAppApiLeafModule(relative);
   if (!isPagesApi && !appApiLeaf && detectNextFileKind(relative) !== "route") {
     return null;
@@ -299,10 +272,7 @@ function findExportWithDefaultFn(rootNode: SgNode<TSX>): SgNode<TSX> | null {
   return null;
 }
 
-function looksLikeNextPagesApiHandler(
-  fn: SgNode<TSX>,
-  fileSource: string,
-): boolean {
+function looksLikeNextPagesApiHandler(fn: SgNode<TSX>, fileSource: string): boolean {
   const paramText = fn.field("parameters")?.text() ?? "";
   if (/NextApiRequest/.test(paramText) && /NextApiResponse/.test(paramText)) {
     return true;
@@ -325,7 +295,7 @@ function collectNonNextImports(rootNode: SgNode<TSX>): string {
 function tryMigrateDefaultExportPagesApi(
   root: Parameters<Codemod<TSX>>[0],
   rootNode: SgNode<TSX>,
-  routeInfo: NonNullable<ReturnType<typeof computeRoutePath>>,
+  routeInfo: NonNullable<ReturnType<typeof computeRoutePath>>
 ): string | null {
   const source = rootNode.text();
   const exportStmt = findExportWithDefaultFn(rootNode);
@@ -340,9 +310,8 @@ function tryMigrateDefaultExportPagesApi(
   const bodyNode = fn.field("body");
   if (!bodyNode || bodyNode.kind() !== "statement_block") return null;
   const bodyText = bodyNode?.text() ?? "{}";
-  const bodyInner = bodyText.startsWith("{") && bodyText.endsWith("}")
-    ? bodyText.slice(1, -1).trim()
-    : bodyText;
+  const bodyInner =
+    bodyText.startsWith("{") && bodyText.endsWith("}") ? bodyText.slice(1, -1).trim() : bodyText;
 
   const kind = inferDefaultExportPagesApiKind(bodyInner);
   if (kind === "GET" && isMultiMethodNextHandler(bodyInner)) return null;
@@ -351,11 +320,7 @@ function tryMigrateDefaultExportPagesApi(
   if (!routePath) return null;
 
   const hasPathParams = /\$[a-zA-Z0-9_]/.test(routePath);
-  const transformed = transformNextApiDefaultHandlerBody(
-    bodyInner,
-    { hasPathParams },
-    kind,
-  );
+  const transformed = transformNextApiDefaultHandlerBody(bodyInner, { hasPathParams }, kind);
 
   if (/\bres\./.test(transformed) || /\breq\./.test(transformed)) {
     return null;
@@ -367,31 +332,17 @@ function tryMigrateDefaultExportPagesApi(
 
   let handlerParams = "()";
   if (usesParams && usesRequest) {
-    handlerParams =
-      "({ request, params }: { request: Request; params: Record<string, string> })";
+    handlerParams = "({ request, params }: { request: Request; params: Record<string, string> })";
   } else if (usesParams) {
-    handlerParams =
-      "({ params }: { params: Record<string, string> })";
+    handlerParams = "({ params }: { params: Record<string, string> })";
   } else if (usesRequest) {
     handlerParams = "({ request }: { request: Request })";
   }
 
   const httpMethod = kind === "POST" ? "POST" : "GET";
-  const asyncKw =
-    kind === "POST" || /\bawait\b/.test(transformed) ? "async " : "";
+  const asyncKw = kind === "POST" || /\bawait\b/.test(transformed) ? "async " : "";
 
-  const newFile =
-    (imports ? imports + "\n\n" : "") +
-    `import { createFileRoute } from "@tanstack/react-router";\n\n` +
-    `export const Route = createFileRoute(${JSON.stringify(routePath)})({\n` +
-    `  server: {\n` +
-    `    handlers: {\n` +
-    `      ${httpMethod}: ${asyncKw}${handlerParams} => {\n` +
-    indent(transformed, 8) +
-    `\n      },\n` +
-    `    },\n` +
-    `  },\n` +
-    `});\n`;
+  const newFile = `${imports ? `${imports}\n\n` : ""}import { createFileRoute } from "@tanstack/react-router";\n\nexport const Route = createFileRoute(${JSON.stringify(routePath)})({\n  server: {\n    handlers: {\n      ${httpMethod}: ${asyncKw}${handlerParams} => {\n${indent(transformed, 8)}\n      },\n    },\n  },\n});\n`;
 
   const newPath = resolveRenameTarget(root, routeInfo.newPath);
   ensureParentDir(newPath);
@@ -422,9 +373,7 @@ function collectHandlers(rootNode: SgNode<TSX>): Handler[] {
 }
 
 /** `export async function GET(...) { ... }` / `export function POST(...)`. */
-function handlerFromFunctionMethodExport(
-  exportStmt: SgNode<TSX>,
-): Handler | null {
+function handlerFromFunctionMethodExport(exportStmt: SgNode<TSX>): Handler | null {
   const fn = firstChildOfKind(exportStmt, "function_declaration");
   if (!fn) return null;
   const name = fn.field("name")?.text();
@@ -437,9 +386,7 @@ function handlerFromFunctionMethodExport(
  * App / Pages routes sometimes use `export const POST = async (req, res) => { … }`.
  * Treat like a named HTTP export so we hoist instead of fragile fallbacks.
  */
-function handlerFromConstMethodExport(
-  exportStmt: SgNode<TSX>,
-): Handler | null {
+function handlerFromConstMethodExport(exportStmt: SgNode<TSX>): Handler | null {
   const lex =
     firstChildOfKind(exportStmt, "lexical_declaration") ??
     firstChildOfKind(exportStmt, "variable_declaration");
@@ -458,41 +405,26 @@ function handlerFromConstMethodExport(
   return { method, exportStmt, fn, isAsync };
 }
 
-function normalizeCallableHttpHandlerValue(
-  value: SgNode<TSX>,
-): SgNode<TSX> | null {
+function normalizeCallableHttpHandlerValue(value: SgNode<TSX>): SgNode<TSX> | null {
   if (value.kind() === "arrow_function" || value.kind() === "function_expression") {
     return value;
   }
   if (value.kind() === "parenthesized_expression") {
     const inner =
-      value.children().find((c) =>
-        c.kind() === "arrow_function" || c.kind() === "function_expression"
-      ) ?? null;
+      value
+        .children()
+        .find((c) => c.kind() === "arrow_function" || c.kind() === "function_expression") ?? null;
     return inner;
   }
   return null;
 }
 
-function buildRouteBlock(
-  routePath: string,
-  handlers: Handler[],
-  inlineImport: boolean,
-): string {
+function buildRouteBlock(routePath: string, handlers: Handler[], inlineImport: boolean): string {
   const importLine = inlineImport
     ? `import { createFileRoute } from "@tanstack/react-router";\n\n`
     : "";
   const body = handlers.map(formatHandler).join(",\n");
-  return (
-    importLine +
-    `export const Route = createFileRoute(${JSON.stringify(routePath)})({\n` +
-    `  server: {\n` +
-    `    handlers: {\n` +
-    `${indent(body, 6)},\n` +
-    `    },\n` +
-    `  },\n` +
-    `});`
-  );
+  return `${importLine}export const Route = createFileRoute(${JSON.stringify(routePath)})({\n  server: {\n    handlers: {\n${indent(body, 6)},\n    },\n  },\n});`;
 }
 
 function formatHandler(handler: Handler): string {
@@ -554,7 +486,7 @@ function emitTodo(rootNode: SgNode<TSX>): string {
   const edit = insertTodoBefore(
     firstChild,
     "route.ts path could not be mapped to a TanStack route — migrate by hand",
-    API_ROUTES_DOC,
+    API_ROUTES_DOC
   );
   return rootNode.commitEdits([edit]);
 }
@@ -562,14 +494,14 @@ function emitTodo(rootNode: SgNode<TSX>): string {
 function migratePagesApiWithTodo(
   root: Parameters<Codemod<TSX>>[0],
   rootNode: SgNode<TSX>,
-  routeInfo: NonNullable<ReturnType<typeof computeRoutePath>>,
+  routeInfo: NonNullable<ReturnType<typeof computeRoutePath>>
 ): string {
   const firstChild = rootNode.children()[0];
   if (!firstChild) return rootNode.text();
   const edit = insertTodoBefore(
     firstChild,
     "Next.js pages/api route — convert the handler to TanStack Start server route handlers (Web Request/Response)",
-    API_ROUTES_DOC,
+    API_ROUTES_DOC
   );
   const newPath = resolveRenameTarget(root, routeInfo.newPath);
   ensureParentDir(newPath);

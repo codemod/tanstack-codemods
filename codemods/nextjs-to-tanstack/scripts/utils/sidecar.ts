@@ -70,11 +70,7 @@ export function readSidecar(targetDir: string, file = DEFAULT_FILE): SidecarStat
   }
 }
 
-export function writeSidecar(
-  targetDir: string,
-  state: SidecarState,
-  file = DEFAULT_FILE,
-): void {
+export function writeSidecar(targetDir: string, state: SidecarState, file = DEFAULT_FILE): void {
   const fullPath = resolveFilePath(targetDir, file);
   const dir = dirname(fullPath);
   mkdirSync(dir, { recursive: true });

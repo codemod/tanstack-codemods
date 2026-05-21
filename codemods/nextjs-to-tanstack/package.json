@@ -1,6 +1,6 @@
 {
   "name": "@codemod/nextjs-to-tanstack",
-  "version": "1.0.0",
+  "version": "1.3.9",
   "description": "Migrate a project from the Next.js App Router to TanStack Start",
   "type": "module",
   "scripts": {
@@ -41,13 +41,13 @@
     "test:strip-unused-next-imports": "codemod jssg test -l tsx --allow-fs ./scripts/entries/strip-unused-next-imports.ts ./tests/strip-unused-next-imports",
     "test:patch-tooling": "codemod jssg test -l json --allow-fs ./scripts/entries/patch-tooling-and-docs.ts ./tests/patch-tooling",
     "test:cleanup-legacy-pages": "codemod jssg test -l json --allow-fs ./scripts/entries/cleanup-legacy-pages-dir.ts ./tests/cleanup-legacy-pages-dir",
-    "test:loose": "npm run test -- --strictness loose",
+    "test:loose": "pnpm run test -- --strictness loose",
     "check-types": "tsc --noEmit"
   },
   "devDependencies": {
-    "@codemod.com/jssg-types": "latest",
-    "@jssg/utils": "latest",
-    "@types/node": "latest",
-    "typescript": "latest"
+    "@codemod.com/jssg-types": "catalog:",
+    "@jssg/utils": "catalog:",
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
   }
 }

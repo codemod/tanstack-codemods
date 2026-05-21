@@ -10,11 +10,7 @@ import {
   stripNextI18nextServerSideTranslationsImport,
 } from "./rewrite-next-i18next-specifiers.ts";
 
-const DATA_EXPORT_NAMES = [
-  "getStaticProps",
-  "getStaticPaths",
-  "getServerSideProps",
-];
+const DATA_EXPORT_NAMES = ["getStaticProps", "getStaticPaths", "getServerSideProps"];
 
 const REMOVABLE_NEXT_IDENTIFIERS = new Set([
   "GetStaticProps",
@@ -70,7 +66,11 @@ export function stripOneDataExport(source: string, name: string): string {
   if (closeBrace === -1) return source;
 
   let end = closeBrace + 1;
-  while (end < source.length && /\s/.test(source[end]!)) end++;
+  while (end < source.length) {
+    const ch = source[end];
+    if (ch === undefined || !/\s/.test(ch)) break;
+    end++;
+  }
   if (end < source.length && source[end] === ";") end++;
   while (end < source.length && (source[end] === "\n" || source[end] === "\r")) end++;
   return source.slice(0, exportStart) + source.slice(end);
@@ -90,30 +90,24 @@ export function stripNextDataExportDeclarations(source: string): string {
 
 /** Orphan tail: `) => { ... serverSideTranslations ... };` */
 export function stripOrphanServerSideTranslationsTail(source: string): string {
-  return source.replace(
-    /\n\) => \{\s*\n[\s\S]*?serverSideTranslations[\s\S]*?\n\};\s*/g,
-    "\n",
-  );
+  return source.replace(/\n\) => \{\s*\n[\s\S]*?serverSideTranslations[\s\S]*?\n\};\s*/g, "\n");
 }
 
 export function stripNextTypeOnlyImports(source: string): string {
   const lines = source.split("\n");
   const out: string[] = [];
   for (const line of lines) {
-    const m = line.match(
-      /^(\s*)import\s+type\s+\{\s*([^}]+)\}\s+from\s+["']next["']\s*;?\s*$/,
-    );
+    const m = line.match(/^(\s*)import\s+type\s+\{\s*([^}]+)\}\s+from\s+["']next["']\s*;?\s*$/);
     if (!m) {
       out.push(line);
       continue;
     }
-    const names = m[2]!
+    const names = (m[2] ?? "")
       .split(",")
       .map((s) => s.trim())
-      .map((part) => part.split(/\s+/)[0]!)
+      .map((part) => part.split(/\s+/)[0] ?? "")
       .filter(Boolean);
-    const allRemovable =
-      names.length > 0 && names.every((n) => REMOVABLE_NEXT_IDENTIFIERS.has(n));
+    const allRemovable = names.length > 0 && names.every((n) => REMOVABLE_NEXT_IDENTIFIERS.has(n));
     if (allRemovable) continue;
     out.push(line);
   }
@@ -129,10 +123,7 @@ export function rewriteNextI18nextUseTranslation(source: string): string {
 }
 
 export function stripNextHeadImport(source: string): string {
-  let s = source.replace(
-    /^\s*import\s+Head\s+from\s+["']next\/head["']\s*;?\s*\n/gm,
-    "",
-  );
+  let s = source.replace(/^\s*import\s+Head\s+from\s+["']next\/head["']\s*;?\s*\n/gm, "");
   s = s.replace(/^\/\/\s*TODO: replace `next\/head`[^\n]*\n/gm, "");
   return s;
 }
@@ -142,16 +133,13 @@ function ensureUseEffectInReactImport(source: string): string {
   const reactImport = /import\s+\{([^}]*)\}\s+from\s+["']react["']/;
   const m = reactImport.exec(source);
   if (m) {
-    const inner = m[1]!
+    const inner = (m[1] ?? "")
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean);
     if (!inner.includes("useEffect")) {
       inner.unshift("useEffect");
-      return source.replace(
-        reactImport,
-        `import { ${inner.join(", ")} } from "react"`,
-      );
+      return source.replace(reactImport, `import { ${inner.join(", ")} } from "react"`);
     }
     return source;
   }
@@ -162,12 +150,12 @@ export function replaceNextHeadWithDocumentTitleEffect(source: string): string {
   const headRe = /<Head>\s*<title>([\s\S]*?)<\/title>\s*<\/Head>\s*/g;
   const m = headRe.exec(source);
   if (!m) return source;
-  const titleInner = m[1]!.replace(/\s+/g, " ").trim();
+  const titleInner = (m[1] ?? "").replace(/\s+/g, " ").trim();
   let without = source.replace(headRe, "");
 
-  const calls = [
-    ...titleInner.matchAll(/\bt\(\s*(["'])([^"']*)\1\s*\)/g),
-  ].map((x) => `t(${JSON.stringify(x[2]!)})`);
+  const calls = [...titleInner.matchAll(/\bt\(\s*(["'])([^"']*)\1\s*\)/g)].map(
+    (x) => `t(${JSON.stringify(x[2] ?? "")})`
+  );
 
   if (!/\buseTranslation\b/.test(without)) return without;
 
@@ -182,7 +170,7 @@ export function replaceNextHeadWithDocumentTitleEffect(source: string): string {
   without = ensureUseEffectInReactImport(without);
   return without.replace(
     /(\bconst\s+{\s*t\s*}\s*=\s*useTranslation\([^)]*\);\s*\n)/,
-    `$1${effect}`,
+    `$1${effect}`
   );
 }
 
@@ -204,9 +192,17 @@ export function truncateAfterFirstRouteDeclaration(source: string): string {
   const closeBrace = indexOfMatchingBrace(source, openBraceIdx);
   if (closeBrace === -1) return source;
   let j = closeBrace + 1;
-  while (j < source.length && /\s/.test(source[j]!)) j++;
+  while (j < source.length) {
+    const ch = source[j];
+    if (ch === undefined || !/\s/.test(ch)) break;
+    j++;
+  }
   if (j < source.length && source[j] === ")") j++;
-  while (j < source.length && /\s/.test(source[j]!)) j++;
+  while (j < source.length) {
+    const ch = source[j];
+    if (ch === undefined || !/\s/.test(ch)) break;
+    j++;
+  }
   if (j < source.length && source[j] === ";") j++;
   return `${source.slice(0, j).trimEnd()}\n`;
 }
@@ -218,9 +214,7 @@ export function truncateAfterFirstRouteDeclaration(source: string): string {
 export function stripOrphanFragmentsAfterRouteClose(source: string): string {
   let s = source;
   /** Orphan from `|| "fa"` when `...(` was stripped — line may start with `|` or partial `SideTranslations`. */
-  const pipeTail = /\}\);\s*(?:\r?\n)+\s*(?:\|[^\n]*|\w*SideTranslations[\s\S]*)/.exec(
-    s,
-  );
+  const pipeTail = /\}\);\s*(?:\r?\n)+\s*(?:\|[^\n]*|\w*SideTranslations[\s\S]*)/.exec(s);
   if (pipeTail) {
     const local = s.slice(pipeTail.index);
     const m = local.match(/^\}\);\s*/);
@@ -229,7 +223,7 @@ export function stripOrphanFragmentsAfterRouteClose(source: string): string {
   }
   s = s.replace(
     /\}\);\s*(?:\r?\n)+\s*\{\s*return\s*\{[\s\S]*?serverSideTranslations[\s\S]*?\}\s*;\s*\}\s*;?\s*/m,
-    "});\n",
+    "});\n"
   );
   return s;
 }
@@ -238,9 +232,7 @@ export function stripOrphanFragmentsAfterRouteClose(source: string): string {
 export function applyRepairRouteTailPipeline(source: string): string {
   let out = source;
   for (let i = 0; i < 8; i++) {
-    const step = truncateAfterFirstRouteDeclaration(
-      stripOrphanFragmentsAfterRouteClose(out),
-    );
+    const step = truncateAfterFirstRouteDeclaration(stripOrphanFragmentsAfterRouteClose(out));
     if (step === out) break;
     out = step;
   }

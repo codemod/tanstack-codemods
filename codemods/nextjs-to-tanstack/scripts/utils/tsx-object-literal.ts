@@ -5,18 +5,18 @@ import { utf8ByteOffsetToUtf16Index } from "./js-string-utf8-offsets.ts";
 
 /** UTF-16 code unit index of the opening `{` of an `object` literal (handles TSX `range()` drift). */
 export function objectLiteralOpenBraceIndex(source: string, obj: SgNode<TSX>): number {
-  let open = utf8ByteOffsetToUtf16Index(source, obj.range().start.index);
+  const open = utf8ByteOffsetToUtf16Index(source, obj.range().start.index);
   if (open < source.length && source[open] === "{") return open;
 
-  let minPairStart = Infinity;
+  let minPairStart = Number.POSITIVE_INFINITY;
   for (const child of obj.children()) {
     if (child.kind() !== "pair") continue;
     minPairStart = Math.min(
       minPairStart,
-      utf8ByteOffsetToUtf16Index(source, child.range().start.index),
+      utf8ByteOffsetToUtf16Index(source, child.range().start.index)
     );
   }
-  if (minPairStart !== Infinity) {
+  if (minPairStart !== Number.POSITIVE_INFINITY) {
     const routeObjMarker = source.lastIndexOf(")({", minPairStart);
     if (routeObjMarker !== -1) {
       const braceIdx = routeObjMarker + 2;
@@ -42,10 +42,7 @@ export function objectLiteralOpenBraceIndex(source: string, obj: SgNode<TSX>): n
  * code cannot make `range().end` (or a raw `end - 1`) point at the wrong `}` in
  * large route files.
  */
-export function closingBraceIndexOfObjectLiteral(
-  source: string,
-  obj: SgNode<TSX>,
-): number | null {
+export function closingBraceIndexOfObjectLiteral(source: string, obj: SgNode<TSX>): number | null {
   const open = objectLiteralOpenBraceIndex(source, obj);
   if (open >= source.length || source[open] !== "{") {
     const endB = obj.range().end.index;
@@ -61,21 +58,21 @@ export function closingBraceIndexOfObjectLiteral(
  * If the line containing `i` has a `//` line comment (not `http://`), return the index of
  * the last non-whitespace character before that comment; otherwise return `i`.
  */
-function surfaceIndexBeforeLineComment(
-  source: string,
-  objOpen: number,
-  i: number,
-): number {
+function surfaceIndexBeforeLineComment(source: string, objOpen: number, i: number): number {
   const lineStart = Math.max(objOpen + 1, source.lastIndexOf("\n", i - 1) + 1);
   const seg = source.slice(lineStart, i + 1);
   for (let u = 0; u + 1 < seg.length; u++) {
     if (seg[u] !== "/" || seg[u + 1] !== "/") continue;
-    const prev = u === 0 ? " " : seg[u - 1]!;
+    const prev = u === 0 ? " " : (seg[u - 1] ?? " ");
     // Avoid `http://`, `https://`, `foo://` (comment usually has ws/punctuation before `//`).
     if (!/[\s,;(){}\[\]=<>]/.test(prev)) continue;
     const abs = lineStart + u;
     let t = abs - 1;
-    while (t >= lineStart && /\s/.test(source[t]!)) t--;
+    while (t >= lineStart) {
+      const ch = source[t];
+      if (ch === undefined || !/\s/.test(ch)) break;
+      t--;
+    }
     return Math.max(objOpen, t);
   }
   return i;
@@ -92,13 +89,17 @@ function surfaceIndexBeforeLineComment(
 export function objectLiteralNeedsCommaAfterLastProperty(
   source: string,
   configObj: SgNode<TSX>,
-  closeBrace: number,
+  closeBrace: number
 ): boolean {
   const objOpen = objectLiteralOpenBraceIndex(source, configObj);
 
   /** If only whitespace sits between `}` and a `,`, the object already has a trailing comma. */
   let j = closeBrace - 1;
-  while (j > objOpen && /\s/.test(source[j]!)) j--;
+  while (j > objOpen) {
+    const ch = source[j];
+    if (ch === undefined || !/\s/.test(ch)) break;
+    j--;
+  }
   if (j > objOpen && source[j] === ",") return false;
 
   let i = closeBrace - 1;
@@ -111,7 +112,8 @@ export function objectLiteralNeedsCommaAfterLastProperty(
       i = surfaceIndexBeforeLineComment(source, objOpen, i);
     }
 
-    const c = source[i]!;
+    const c = source[i];
+    if (c === undefined) break;
 
     if (brace === 0 && paren === 0 && bracket === 0) {
       if (/\s/.test(c)) {

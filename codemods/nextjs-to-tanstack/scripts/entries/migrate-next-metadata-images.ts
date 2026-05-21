@@ -56,14 +56,10 @@ const codemod: Codemod<TSX> = async (root) => {
   const cleanedBody = stripAwaitParamsDestructures(bodyInner);
 
   const getSig =
-    paramNames.length === 0
-      ? "async ()"
-      : "async ({ params }: { params: Record<string, string> })";
+    paramNames.length === 0 ? "async ()" : "async ({ params }: { params: Record<string, string> })";
 
   const paramPrologue =
-    paramNames.length === 0
-      ? ""
-      : `        const { ${paramNames.join(", ")} } = params;\n`;
+    paramNames.length === 0 ? "" : `        const { ${paramNames.join(", ")} } = params;\n`;
 
   const { importLines, restBlock } = buildPreservedParts(rootNode, defaultExport);
   const needsRouterImport =
@@ -76,18 +72,7 @@ const codemod: Codemod<TSX> = async (root) => {
   const importBlock = mergeRouterImportLine(importLines, routerImport);
   const preserved = [importBlock, restBlock].filter(Boolean).join("\n\n");
 
-  const newFile =
-    `${preserved.trimEnd()}\n\n` +
-    `export const Route = createFileRoute(${JSON.stringify(routeInfo.routePath)})({\n` +
-    `  server: {\n` +
-    `    handlers: {\n` +
-    `      GET: ${getSig} => {\n` +
-    paramPrologue +
-    indent(dedentCommonMinimum(cleanedBody.trimEnd()), 8) +
-    `\n      },\n` +
-    `    },\n` +
-    `  },\n` +
-    `});\n`;
+  const newFile = `${preserved.trimEnd()}\n\nexport const Route = createFileRoute(${JSON.stringify(routeInfo.routePath)})({\n  server: {\n    handlers: {\n      GET: ${getSig} => {\n${paramPrologue}${indent(dedentCommonMinimum(cleanedBody.trimEnd()), 8)}\n      },\n    },\n  },\n});\n`;
 
   const newPath = resolveRenameTarget(root, routeInfo.newPath);
   ensureParentDir(newPath);
@@ -107,9 +92,9 @@ export default codemod;
 function findDefaultExportStmt(rootNode: SgNode<TSX>): SgNode<TSX> | null {
   for (const stmt of rootNode.children()) {
     if (stmt.kind() !== "export_statement") continue;
-    const hasDefault = stmt.children().some(
-      (c) => c.kind() === "default" || c.text() === "default",
-    );
+    const hasDefault = stmt
+      .children()
+      .some((c) => c.kind() === "default" || c.text() === "default");
     if (hasDefault) return stmt;
   }
   return null;
@@ -119,8 +104,7 @@ function extractDefaultAsyncFunction(exportStmt: SgNode<TSX>): SgNode<TSX> | nul
   const exportAsync = exportStmt.children().some((c) => c.kind() === "async");
   for (const child of exportStmt.children()) {
     if (child.kind() !== "function_declaration") continue;
-    const fnAsync =
-      exportAsync || child.children().some((c) => c.kind() === "async");
+    const fnAsync = exportAsync || child.children().some((c) => c.kind() === "async");
     if (!fnAsync) return null;
     return child;
   }
@@ -138,9 +122,11 @@ function extractFunctionBodyInner(fn: SgNode<TSX>): string | null {
 function pathParamsFromRoutePath(routePath: string): string[] {
   const names: string[] = [];
   const re = /\$([a-zA-Z_][a-zA-Z0-9_]*)/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(routePath)) !== null) {
-    names.push(m[1]!);
+  let m: RegExpExecArray | null = re.exec(routePath);
+  while (m !== null) {
+    const cap = m[1];
+    if (cap !== undefined) names.push(cap);
+    m = re.exec(routePath);
   }
   return names;
 }
@@ -153,7 +139,7 @@ function stripAwaitParamsDestructures(body: string): string {
 
 function buildPreservedParts(
   rootNode: SgNode<TSX>,
-  defaultExport: SgNode<TSX>,
+  defaultExport: SgNode<TSX>
 ): { importLines: string[]; restBlock: string } {
   const skipStart = defaultExport.range().start.index;
   const imports: string[] = [];
@@ -200,12 +186,8 @@ function dedentCommonMinimum(text: string): string {
   const lines = text.split("\n");
   const nonempty = lines.filter((l) => l.trim().length > 0);
   if (nonempty.length === 0) return text;
-  const minIndent = Math.min(
-    ...nonempty.map((l) => (l.match(/^\s*/) ?? [""])[0].length),
-  );
-  return lines
-    .map((l) => (l.trim().length === 0 ? l : l.slice(minIndent)))
-    .join("\n");
+  const minIndent = Math.min(...nonempty.map((l) => (l.match(/^\s*/) ?? [""])[0].length));
+  return lines.map((l) => (l.trim().length === 0 ? l : l.slice(minIndent))).join("\n");
 }
 
 function coerceAppRouterRelative(appRel: string, absFile: string): string {

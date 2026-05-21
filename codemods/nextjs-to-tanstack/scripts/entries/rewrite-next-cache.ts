@@ -24,15 +24,11 @@ import { TODO_PREFIX } from "../utils/sentinels.ts";
 const NEXT_CACHE = "next/cache";
 
 const R4E_TODO_SENTINEL = "next/cache migration (R4e)";
-const R4E_TODO_DOC = "https://tanstack.com/query/latest/docs/framework/react/guides/query-invalidation";
+const R4E_TODO_DOC =
+  "https://tanstack.com/query/latest/docs/framework/react/guides/query-invalidation";
 const R4E_CACHING_DOC = "https://tanstack.com/query/latest/docs/framework/react/guides/caching";
 
-type Builtin =
-  | "revalidateTag"
-  | "revalidatePath"
-  | "unstable_cache"
-  | "cache"
-  | "unstable_noStore";
+type Builtin = "revalidateTag" | "revalidatePath" | "unstable_cache" | "cache" | "unstable_noStore";
 
 type ImportSpecPiece = {
   exported: string;
@@ -81,14 +77,13 @@ const codemod: Codemod<TSX> = async (root) => {
     const plan = planNextCacheImportRewrite(
       stmt,
       invalidateCount > 0 && qcSpecifier != null,
-      qcSpecifier,
+      qcSpecifier
     );
     if (plan.kind === "noop") continue;
 
     const nl = /\r?\n$/.exec(stmt.text())?.[0] ?? "\n";
 
-    if (plan.kind === "delete")
-      edits.push(removeStatementSpan(source, stmt, nextTodoLead()));
+    if (plan.kind === "delete") edits.push(removeStatementSpan(source, stmt, nextTodoLead()));
     else if (plan.body + nl !== stmt.text()) {
       edits.push(stmt.replace(`${nextTodoLead()}${plan.body}${nl}`));
     }
@@ -119,8 +114,7 @@ const codemod: Codemod<TSX> = async (root) => {
       if (!fst) continue;
       const args = extractCallArgs(call);
       const bindName = variableDeclaratorIdentForRhs(call);
-      const tail =
-        builtin === "unstable_cache" && !bindName ? unstableCacheTrailingHint(args) : "";
+      const tail = builtin === "unstable_cache" && !bindName ? unstableCacheTrailingHint(args) : "";
       edits.push(call.replace(`${nextTodoLead()}${fst.text()}${tail}`));
       const qoInsert = queryOptionsInsertAfterExport(source, call, bindName, args, builtin);
       if (qoInsert) edits.push(qoInsert);
@@ -137,9 +131,7 @@ const codemod: Codemod<TSX> = async (root) => {
           ? `'next-cache', 'path', ${path.text()}, ${typ.text()}`
           : `'next-cache', 'path', ${path.text()}`;
       edits.push(
-        call.replace(
-          `${nextTodoLead()}queryClient.invalidateQueries({ queryKey: [${keyInner}] })`,
-        ),
+        call.replace(`${nextTodoLead()}queryClient.invalidateQueries({ queryKey: [${keyInner}] })`)
       );
       continue;
     }
@@ -149,8 +141,8 @@ const codemod: Codemod<TSX> = async (root) => {
 
     edits.push(
       call.replace(
-        `${nextTodoLead()}queryClient.invalidateQueries({ queryKey: ['next-cache', 'tag', ${arg.text()}] })`,
-      ),
+        `${nextTodoLead()}queryClient.invalidateQueries({ queryKey: ['next-cache', 'tag', ${arg.text()}] })`
+      )
     );
   }
 
@@ -183,13 +175,14 @@ function queryOptionsInsertAfterExport(
   call: SgNode<TSX>,
   bindName: string | null,
   args: SgNode<TSX>[],
-  builtin: "cache" | "unstable_cache",
+  builtin: "cache" | "unstable_cache"
 ): Edit | null {
   if (!bindName) return null;
   const optName = `${bindName}QueryOptions`;
   if (new RegExp(`\\b${escapeReg(optName)}\\b`).test(source)) return null;
 
-  const container = ascendToKind(call, "export_statement") ?? ascendToKind(call, "lexical_declaration");
+  const container =
+    ascendToKind(call, "export_statement") ?? ascendToKind(call, "lexical_declaration");
   if (!container) return null;
 
   const queryKeyTs = buildQueryKeyTypeScript(bindName, args[1], builtin);
@@ -228,7 +221,7 @@ function ascendToKind(node: SgNode<TSX>, kind: string): SgNode<TSX> | null {
 function buildQueryKeyTypeScript(
   bindName: string,
   keyArg: SgNode<TSX> | undefined,
-  builtin: "cache" | "unstable_cache",
+  builtin: "cache" | "unstable_cache"
 ): string {
   if (builtin === "unstable_cache" && keyArg) {
     const strings = stringLiteralsFromArrayExpression(keyArg);
@@ -360,21 +353,18 @@ function builtinForExported(name: string): Builtin | null {
 function parseImportPiece(raw: string): ImportSpecPiece | null {
   const t = raw.trim();
   const asMatch = /^([A-Za-z0-9_]+)\s+as\s+([A-Za-z0-9_]+)$/.exec(t);
-  if (asMatch) return { exported: asMatch[1]!, local: asMatch[2]!, raw: t };
+  if (asMatch) return { exported: asMatch[1] ?? "", local: asMatch[2] ?? "", raw: t };
   const id = /^([A-Za-z0-9_]+)$/.exec(t);
   if (!id) return null;
-  return { exported: id[1]!, local: id[1]!, raw: t };
+  return { exported: id[1] ?? "", local: id[1] ?? "", raw: t };
 }
 
-type ImportRewritePlan =
-  | { kind: "noop" }
-  | { kind: "delete" }
-  | { kind: "replace"; body: string };
+type ImportRewritePlan = { kind: "noop" } | { kind: "delete" } | { kind: "replace"; body: string };
 
 function planNextCacheImportRewrite(
   stmt: SgNode<TSX>,
   needsQc: boolean,
-  qcSpecifier: string | null,
+  qcSpecifier: string | null
 ): ImportRewritePlan {
   const src = stmt.text();
   const brace = extractNamedBrace(src);
@@ -402,7 +392,9 @@ function planNextCacheImportRewrite(
 
 function sourceStmtHasQueryImport(stmtText: string, qcSpecifier: string): boolean {
   const q = escapeReg(qcSpecifier);
-  return new RegExp(`import\\s+\\{[^}]*\\bqueryClient\\b[^}]*}\\s*from\\s*["']${q}["']`).test(stmtText);
+  return new RegExp(`import\\s+\\{[^}]*\\bqueryClient\\b[^}]*}\\s*from\\s*["']${q}["']`).test(
+    stmtText
+  );
 }
 
 function escapeReg(s: string): string {

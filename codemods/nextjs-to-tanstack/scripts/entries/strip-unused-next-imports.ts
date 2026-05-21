@@ -57,7 +57,8 @@ function extractImportBindings(stmt: SgNode<TSX>): string[] {
   for (const spec of stmt.findAll({ rule: { kind: "import_specifier" } })) {
     const ids = spec.findAll({ rule: { kind: "identifier" } });
     if (ids.length === 0) continue;
-    locals.push(ids.length >= 2 ? ids[1]!.text() : ids[0]!.text());
+    const localName = ids.length >= 2 ? ids[1]?.text() : ids[0]?.text();
+    if (localName !== undefined) locals.push(localName);
   }
   const clause = stmt.find({ rule: { kind: "import_clause" } });
   if (clause) {
@@ -74,11 +75,7 @@ function extractImportBindings(stmt: SgNode<TSX>): string[] {
   return locals;
 }
 
-function isBindingUsed(
-  rootNode: SgNode<TSX>,
-  importStmt: SgNode<TSX>,
-  localName: string,
-): boolean {
+function isBindingUsed(rootNode: SgNode<TSX>, importStmt: SgNode<TSX>, localName: string): boolean {
   const ir = importStmt.range();
   const rx = `^${escapeRegex(localName)}$`;
 

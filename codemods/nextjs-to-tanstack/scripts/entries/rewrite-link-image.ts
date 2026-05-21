@@ -22,7 +22,12 @@
 
 import type { Codemod, Edit, SgNode } from "codemod:ast-grep";
 import type TSX from "codemod:ast-grep/langs/tsx";
-import { addImport, getImport, removeImport, tanstackRouterNamedImportCommaFixEdits } from "../utils/imports.ts";
+import {
+  addImport,
+  getImport,
+  removeImport,
+  tanstackRouterNamedImportCommaFixEdits,
+} from "../utils/imports.ts";
 
 const NEXT_LINK = "next/link";
 const NEXT_IMAGE = "next/image";
@@ -64,10 +69,7 @@ function rewriteNextLinkTypeOnlyImports(rootNode: SgNode<TSX>): Edit[] {
     const t = stmt.text();
     if (!/from\s*["']next\/link["']/.test(t)) continue;
     if (!isNextLinkTypeOnlyImportStatement(t)) continue;
-    const next = t.replace(
-      /from\s*["']next\/link["']/,
-      `from "${TANSTACK_ROUTER}"`,
-    );
+    const next = t.replace(/from\s*["']next\/link["']/, `from "${TANSTACK_ROUTER}"`);
     if (next === t) continue;
     edits.push({
       startPos: stmt.range().start.index,
@@ -101,9 +103,7 @@ function rewriteLink(rootNode: SgNode<TSX>, alias: string): Edit[] {
 
     const hrefAttr = findAttrOnOpening(openEl, "href");
     if (hrefAttr && hrefAttrRequiresNativeAnchor(hrefAttr)) {
-      edits.push(
-        target.replace(patchNextLinkFragmentToAnchor(target.text(), alias)),
-      );
+      edits.push(target.replace(patchNextLinkFragmentToAnchor(target.text(), alias)));
       continue;
     }
 
@@ -115,12 +115,11 @@ function rewriteLink(rootNode: SgNode<TSX>, alias: string): Edit[] {
 
       if (prop === "prefetch") {
         const jsxVal = attrValueNode(attr);
-        let raw =
-          jsxVal?.text()?.trim().replace(/^=\s*/, "") ?? "true";
+        let raw = jsxVal?.text()?.trim().replace(/^=\s*/, "") ?? "true";
         raw = raw.replace(/^\{/g, "").replace(/\}$/g, "").trim();
 
         if (raw === "true") edits.push(attr.replace(`preload="intent"`));
-        else if (raw === "false") edits.push(attr.replace(`preload={false}`));
+        else if (raw === "false") edits.push(attr.replace("preload={false}"));
         else edits.push(attr.replace(`preload={${raw} ? "intent" : false}`));
         continue;
       }
@@ -189,10 +188,7 @@ function outerJsxReplacementTarget(opening: SgNode<TSX>): SgNode<TSX> {
 }
 
 function jsxOpeningFromSubject(subject: SgNode<TSX>): SgNode<TSX> | null {
-  if (
-    subject.kind() === "jsx_self_closing_element" ||
-    subject.kind() === "jsx_opening_element"
-  ) {
+  if (subject.kind() === "jsx_self_closing_element" || subject.kind() === "jsx_opening_element") {
     return subject;
   }
   if (subject.kind() === "jsx_element") {
@@ -243,24 +239,21 @@ function hrefAttrRequiresNativeAnchor(hrefAttr: SgNode<TSX>): boolean {
 /** `href={"#x"}` / `href={'#x'}` */
 function jsxExpressionStringLiteral(expr: SgNode<TSX>): string | null {
   const children = expr.children();
-  const meaningful = children.filter(
-    (c) => c.kind() !== "{" && c.kind() !== "}",
-  );
+  const meaningful = children.filter((c) => c.kind() !== "{" && c.kind() !== "}");
   if (meaningful.length !== 1) return null;
-  const only = meaningful[0]!;
-  if (only.kind() !== "string") return null;
+  const only = meaningful[0];
+  if (only === undefined || only.kind() !== "string") return null;
   const frag = only.find({ rule: { kind: "string_fragment" } });
   return frag?.text() ?? null;
 }
 
 function stripNextLinkOnlyAttrsFromConvertedAnchor(fragment: string): string {
   let s = fragment;
-  const attrNames =
-    "prefetch|scroll|as|shallow|locale|legacyBehavior|passHref";
+  const attrNames = "prefetch|scroll|as|shallow|locale|legacyBehavior|passHref";
   for (let i = 0; i < 12; i++) {
     const t = s.replace(
       new RegExp(`\\s(?:${attrNames})(?:=\\{[^}]*\\}|="[^"]*"|='[^']*')`, "g"),
-      "",
+      ""
     );
     if (t === s) break;
     s = t;
@@ -342,7 +335,9 @@ function rewriteImage(rootNode: SgNode<TSX>, alias: string): Edit[] {
       }
 
       if (
-        ["quality", "unoptimized", "loader", "loaderFile", "objectFit", "preload"].includes(attrName)
+        ["quality", "unoptimized", "loader", "loaderFile", "objectFit", "preload"].includes(
+          attrName
+        )
       ) {
         edits.push(dropJsxAttr(attr, source));
       }

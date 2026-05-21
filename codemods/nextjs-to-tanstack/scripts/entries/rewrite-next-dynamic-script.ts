@@ -90,19 +90,13 @@ function rewriteHead(rootNode: SgNode<TSX>, alias: string): Edit[] {
     if (!openEl) continue;
     if (target.kind() === "jsx_self_closing_element") {
       let ot = openEl.text();
-      ot = ot.replace(
-        new RegExp(`^<\\s*${escapeRegex(alias)}\\s*\\/\\s*>`),
-        "<></>",
-      );
+      ot = ot.replace(new RegExp(`^<\\s*${escapeRegex(alias)}\\s*\\/\\s*>`), "<></>");
       edits.push(openEl.replace(ot));
       continue;
     }
     if (target.kind() === "jsx_element") {
       let ot = openEl.text();
-      ot = ot.replace(
-        new RegExp(`^<\\s*${escapeRegex(alias)}\\s*>`),
-        "<>",
-      );
+      ot = ot.replace(new RegExp(`^<\\s*${escapeRegex(alias)}\\s*>`), "<>");
       edits.push(openEl.replace(ot));
       const close = target.children().find((c) => c.kind() === "jsx_closing_element");
       if (close) {
@@ -320,7 +314,7 @@ function rewriteScript(rootNode: SgNode<TSX>, alias: string): Edit[] | "skip" {
         const ct = close.text();
         const nextClose = ct.replace(
           new RegExp(`</\\s*${escapeRegex(alias)}\\s*>`, "i"),
-          "</script>",
+          "</script>"
         );
         if (nextClose !== ct) edits.push(close.replace(nextClose));
       }
@@ -334,7 +328,7 @@ function patchScriptOpeningText(
   openText: string,
   alias: string,
   useDefer: boolean,
-  useAsync: boolean,
+  useAsync: boolean
 ): string | null {
   let t = openText.replace(new RegExp(`^<\\s*${escapeRegex(alias)}\\b`), "<script");
   if (!/^<\s*script\b/.test(t)) return null;
@@ -407,10 +401,7 @@ function outerJsxReplacementTarget(opening: SgNode<TSX>): SgNode<TSX> {
 }
 
 function jsxOpeningFromSubject(subject: SgNode<TSX>): SgNode<TSX> | null {
-  if (
-    subject.kind() === "jsx_self_closing_element" ||
-    subject.kind() === "jsx_opening_element"
-  ) {
+  if (subject.kind() === "jsx_self_closing_element" || subject.kind() === "jsx_opening_element") {
     return subject;
   }
   if (subject.kind() === "jsx_element") {

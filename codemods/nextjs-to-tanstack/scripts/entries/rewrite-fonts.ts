@@ -133,13 +133,7 @@ const codemod: Codemod<TSX> = async (root) => {
       const fontDisplay = readObjectStringField(configObj, "display");
       const topWeight = readObjectStringField(configObj, "weight");
       const topStyle = readObjectStringField(configObj, "style");
-      const localFaces = buildLocalFontFaces(
-        configObj,
-        layoutDir,
-        pkgRoot,
-        topWeight,
-        topStyle,
-      );
+      const localFaces = buildLocalFontFaces(configObj, layoutDir, pkgRoot, topWeight, topStyle);
       entry = {
         importSource: LOCAL,
         family: bindingName,
@@ -298,7 +292,7 @@ function buildLocalFontFaces(
   layoutDir: string,
   pkgRoot: string,
   topWeight: string | null,
-  topStyle: string | null,
+  topStyle: string | null
 ): LocalFontFace[] {
   if (!obj) return [];
   const srcVal = findSrcValueNode(obj);
@@ -400,7 +394,7 @@ function attrContainsFontMember(attr: SgNode<TSX>, binding: string): boolean {
  */
 function tryRewriteMixedClassName(
   expr: SgNode<TSX>,
-  bindings: string[],
+  bindings: string[]
 ): { kind: "replace"; literal: string } | { kind: "review" } {
   if (!expr.is("template_string")) {
     return { kind: "review" };
@@ -410,7 +404,7 @@ function tryRewriteMixedClassName(
   for (const b of bindings) {
     const re = new RegExp(
       `\\$\\{\\s*${escapeRegex(b)}\\s*\\.\\s*(?:variable|className|style)\\s*\\}`,
-      "g",
+      "g"
     );
     s = s.replace(re, "");
   }

@@ -92,12 +92,7 @@ function parseI18nBlock(source: string): NextI18nCodemodConfig | null {
   const locales = extractLocalesArray(source);
   if (locales.length === 0 && !defaultLocale) return null;
   const def = defaultLocale ?? locales[0] ?? "en";
-  const merged =
-    locales.length > 0
-      ? locales.includes(def)
-        ? locales
-        : [def, ...locales]
-      : [def];
+  const merged = locales.length > 0 ? (locales.includes(def) ? locales : [def, ...locales]) : [def];
   return { defaultLocale: def, locales: [...new Set(merged)] };
 }
 

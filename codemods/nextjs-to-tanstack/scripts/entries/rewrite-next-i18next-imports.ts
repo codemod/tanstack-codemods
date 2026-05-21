@@ -14,16 +14,14 @@ const codemod: Codemod<TSX> = async (root) => {
   const rootNode = root.root();
   const source = rootNode.text();
   const next = collapseDuplicateTrailingExportClosures(
-    applyNextI18nextToReactI18nextModuleRewrites(source),
+    applyNextI18nextToReactI18nextModuleRewrites(source)
   );
   if (next === source) return null;
   // Use the parser root span, not `source.length`. With non-ASCII source,
   // tree-sitter byte ranges can diverge from JS string indices; a full-buffer
   // replace using `.length` corrupts files when applying edits (garbled tails).
   const { start, end } = rootNode.range();
-  return rootNode.commitEdits([
-    { startPos: start.index, endPos: end.index, insertedText: next },
-  ]);
+  return rootNode.commitEdits([{ startPos: start.index, endPos: end.index, insertedText: next }]);
 };
 
 export default codemod;

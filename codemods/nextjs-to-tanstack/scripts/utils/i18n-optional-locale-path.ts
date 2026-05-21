@@ -62,9 +62,7 @@ export function prefixRouteIdWithOptionalLocale(routePath: string): string {
   return `${OPTIONAL_LOCALE_PREFIX}${routePath}`;
 }
 
-export function applyOptionalLocaleToRoutePathResult(
-  r: RoutePathResult,
-): RoutePathResult {
+export function applyOptionalLocaleToRoutePathResult(r: RoutePathResult): RoutePathResult {
   if (r.routePath === null) return r;
   if (shouldSkipLocalePrefixForAppPath(r.newPath)) return r;
 
@@ -87,7 +85,7 @@ export function applyOptionalLocaleToRoutePathResult(
 }
 
 export function applyOptionalLocaleToSpecialRouteFile(
-  r: SpecialRouteFileResult,
+  r: SpecialRouteFileResult
 ): SpecialRouteFileResult {
   if (shouldSkipLocalePrefixForAppPath(r.newPath)) return r;
   return {
@@ -98,7 +96,7 @@ export function applyOptionalLocaleToSpecialRouteFile(
 }
 
 export function applyOptionalLocaleToMetadataImage(
-  r: MetadataImageRouteResult,
+  r: MetadataImageRouteResult
 ): MetadataImageRouteResult {
   if (shouldSkipLocalePrefixForAppPath(r.newPath)) return r;
   return {

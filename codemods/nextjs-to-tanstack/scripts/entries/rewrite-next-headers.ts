@@ -61,10 +61,14 @@ const codemod: Codemod<TSX> = async (root) => {
   if (cookiesNm && unsupportedCookiesFactories(rootNode, cookiesNm)) return null;
   if (headersNm && unsupportedHeadersFactories(rootNode, headersNm)) return null;
 
-  const cookieBindingsNeedValueStrip = cookiesNm ? cookieGetBindingNames(rootNode, cookiesNm) : new Set<string>();
+  const cookieBindingsNeedValueStrip = cookiesNm
+    ? cookieGetBindingNames(rootNode, cookiesNm)
+    : new Set<string>();
 
   // Stored factory vars: `const X = await cookies(); X.get(name); X.delete(name)` etc.
-  const storedCookieVars = cookiesNm ? collectStoredCookiesVarNames(rootNode, cookiesNm) : new Set<string>();
+  const storedCookieVars = cookiesNm
+    ? collectStoredCookiesVarNames(rootNode, cookiesNm)
+    : new Set<string>();
 
   const needs = scanNeeds(rootNode, cookiesNm, headersNm, storedCookieVars);
   if (
@@ -143,8 +147,8 @@ const codemod: Codemod<TSX> = async (root) => {
       if (prop === "getAll") {
         edits.push(
           outer.replace(
-            `${take()}Object.entries(getCookies()).map(([name, value]) => ({ name, value }))`,
-          ),
+            `${take()}Object.entries(getCookies()).map(([name, value]) => ({ name, value }))`
+          )
         );
         continue;
       }
@@ -197,8 +201,8 @@ const codemod: Codemod<TSX> = async (root) => {
       } else if (prop === "getAll") {
         edits.push(
           outer.replace(
-            `${take()}Object.entries(getCookies()).map(([name, value]) => ({ name, value }))`,
-          ),
+            `${take()}Object.entries(getCookies()).map(([name, value]) => ({ name, value }))`
+          )
         );
       }
     }
@@ -236,8 +240,8 @@ const codemod: Codemod<TSX> = async (root) => {
       const tgt = bareReplacementTarget(c);
       edits.push(
         tgt.replace(
-          `${take()}{ getAll: () => Object.entries(getCookies()).map(([name, value]) => ({ name, value: String(value ?? "") })) }`,
-        ),
+          `${take()}{ getAll: () => Object.entries(getCookies()).map(([name, value]) => ({ name, value: String(value ?? "") })) }`
+        )
       );
     }
   }
@@ -255,8 +259,8 @@ const codemod: Codemod<TSX> = async (root) => {
       const tgt = bareReplacementTarget(h);
       edits.push(
         tgt.replace(
-          `${take()}new Headers(Object.entries(getHeaders()).map(([k, v]) => [k, Array.isArray(v) ? v.join(", ") : String(v ?? "")] as [string, string]))`,
-        ),
+          `${take()}new Headers(Object.entries(getHeaders()).map(([k, v]) => [k, Array.isArray(v) ? v.join(", ") : String(v ?? "")] as [string, string]))`
+        )
       );
     }
   }
@@ -283,7 +287,7 @@ function scanNeeds(
   rootNode: SgNode<TSX>,
   cookiesNm: string | undefined,
   headersNm: string | undefined,
-  storedCookieVars: Set<string> = new Set(),
+  storedCookieVars: Set<string> = new Set()
 ): Needs {
   const needs: Needs = {
     getCookie: false,
@@ -400,9 +404,7 @@ function isSupportedCookieFactoryRoot(factoryCall: SgNode<TSX>): boolean {
       COOKIE_STORE_METHODS.has(p.field("property")?.text() ?? "")
     ) {
       const gp = p.parent();
-      return Boolean(
-        gp?.kind() === "call_expression" && gp.field("function")?.id() === p.id(),
-      );
+      return Boolean(gp?.kind() === "call_expression" && gp.field("function")?.id() === p.id());
     }
     return false;
   }
@@ -423,9 +425,7 @@ function isSupportedHeadersFactoryRoot(factoryCall: SgNode<TSX>): boolean {
       HEADER_STORE_METHODS.has(p.field("property")?.text() ?? "")
     ) {
       const gp = p.parent();
-      return Boolean(
-        gp?.kind() === "call_expression" && gp.field("function")?.id() === p.id(),
-      );
+      return Boolean(gp?.kind() === "call_expression" && gp.field("function")?.id() === p.id());
     }
     return false;
   }
@@ -457,7 +457,10 @@ function bareReplacementTarget(factoryCall: SgNode<TSX>): SgNode<TSX> {
   return factoryCall;
 }
 
-function unwrapToCookiesFactory(node: SgNode<TSX>, cookiesNm: string | undefined): SgNode<TSX> | null {
+function unwrapToCookiesFactory(
+  node: SgNode<TSX>,
+  cookiesNm: string | undefined
+): SgNode<TSX> | null {
   if (!cookiesNm) return null;
   let x: SgNode<TSX> | null = node;
   for (;;) {
@@ -484,7 +487,10 @@ function unwrapToCookiesFactory(node: SgNode<TSX>, cookiesNm: string | undefined
   return null;
 }
 
-function unwrapToHeadersFactory(node: SgNode<TSX>, headersNm: string | undefined): SgNode<TSX> | null {
+function unwrapToHeadersFactory(
+  node: SgNode<TSX>,
+  headersNm: string | undefined
+): SgNode<TSX> | null {
   if (!headersNm) return null;
   let x: SgNode<TSX> | null = node;
   for (;;) {
@@ -581,7 +587,7 @@ type ImportRewrite = { kind: "delete" } | { kind: "replace"; text: string };
 function buildImportRewrite(
   stmtText: string,
   locals: Map<string, Builtin>,
-  needs: Needs,
+  needs: Needs
 ): ImportRewrite | null {
   const brace = extractNamedBrace(stmtText);
   if (brace === null) return null;
@@ -647,10 +653,10 @@ function splitSpecs(inner: string): string[] {
 function parsePiece(raw: string): { exported: string; local: string; raw: string } | null {
   const t = raw.trim();
   const am = /^([A-Za-z0-9_]+)\s+as\s+([A-Za-z0-9_]+)$/.exec(t);
-  if (am) return { exported: am[1]!, local: am[2]!, raw: t };
+  if (am) return { exported: am[1] ?? "", local: am[2] ?? "", raw: t };
   const id = /^([A-Za-z0-9_]+)$/.exec(t);
   if (!id) return null;
-  return { exported: id[1]!, local: id[1]!, raw: t };
+  return { exported: id[1] ?? "", local: id[1] ?? "", raw: t };
 }
 
 function extractBindings(stmts: SgNode<TSX>[]): Map<string, Builtin> {
@@ -717,8 +723,12 @@ function blankStmt(source: string, stmt: SgNode<TSX>): Edit {
 function blankStmtFullLine(source: string, stmt: SgNode<TSX>): Edit {
   let start = stmt.range().start.index;
   // Walk back over leading whitespace on this line (stop at newline or start of source).
-  while (start > 0 && source[start - 1] !== "\n" && source[start - 1] !== "\r" &&
-    (source[start - 1] === " " || source[start - 1] === "\t")) {
+  while (
+    start > 0 &&
+    source[start - 1] !== "\n" &&
+    source[start - 1] !== "\r" &&
+    (source[start - 1] === " " || source[start - 1] === "\t")
+  ) {
     start--;
   }
   let end = stmt.range().end.index;

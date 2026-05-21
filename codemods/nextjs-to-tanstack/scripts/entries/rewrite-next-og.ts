@@ -50,11 +50,7 @@ const codemod: Codemod<TSX> = async (root) => {
     }
   }
 
-  if (
-    valueImports.length === 0 &&
-    typeOnlyImports.length === 0 &&
-    imageLocals.size === 0
-  ) {
+  if (valueImports.length === 0 && typeOnlyImports.length === 0 && imageLocals.size === 0) {
     return null;
   }
 
@@ -120,7 +116,7 @@ function stmtDelete(stmt: SgNode<TSX>, source: string): Edit {
 function valueImportReplacementEdit(
   stmt: SgNode<TSX>,
   source: string,
-  needsCreateElement: boolean,
+  needsCreateElement: boolean
 ): Edit {
   return {
     startPos: stmt.range().start.index,
@@ -218,23 +214,23 @@ function unwrapExpr(n: SgNode<TSX>): SgNode<TSX> {
   let x: SgNode<TSX> = n;
   for (;;) {
     if (x.kind() !== "parenthesized_expression") return x;
-    const inner = x
-      .children()
-      .find((c) => c.kind() !== "(" && c.kind() !== ")");
+    const inner = x.children().find((c) => c.kind() !== "(" && c.kind() !== ")");
     if (!inner) return x;
     x = inner as SgNode<TSX>;
   }
 }
 
-function parseImportSpecifier(
-  spec: SgNode<TSX>,
-): { imported: string; local: string } | null {
+function parseImportSpecifier(spec: SgNode<TSX>): { imported: string; local: string } | null {
   const ids = spec.findAll({ rule: { kind: "identifier" } });
   if (ids.length === 2) {
-    return { imported: ids[0]!.text(), local: ids[1]!.text() };
+    const imported = ids[0]?.text();
+    const local = ids[1]?.text();
+    if (imported === undefined || local === undefined) return null;
+    return { imported, local };
   }
   if (ids.length === 1) {
-    const t = ids[0]!.text();
+    const t = ids[0]?.text();
+    if (t === undefined) return null;
     return { imported: t, local: t };
   }
   return null;
@@ -269,9 +265,7 @@ function ensureAsyncFn(fn: SgNode<TSX>, edits: Edit[]): void {
     return;
   }
 
-  const fnKw = fn
-    .children()
-    .find((c) => c.kind() === "function" && c.text() === "function");
+  const fnKw = fn.children().find((c) => c.kind() === "function" && c.text() === "function");
   if (fnKw) {
     edits.push({
       startPos: fnKw.range().start.index,

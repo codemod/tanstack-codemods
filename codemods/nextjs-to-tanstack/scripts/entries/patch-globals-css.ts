@@ -29,7 +29,7 @@ const codemod: Codemod<CSS> = async (root) => {
   const sidecar = readSidecar(targetDir);
   const googleFonts = sidecar.fonts.filter(hasFontsourcePackage);
   const localFonts = sidecar.fonts.filter(
-    (f) => f.importSource === "next/font/local" && f.localFaces && f.localFaces.length > 0,
+    (f) => f.importSource === "next/font/local" && f.localFaces && f.localFaces.length > 0
   );
   if (googleFonts.length === 0 && localFonts.length === 0) return null;
 
@@ -79,11 +79,7 @@ function buildGoogleFontsourceImports(source: string, fonts: FontEntry[]): strin
   return `${lines.join("\n")}\n`;
 }
 
-function buildLocalFontFaceBlock(
-  source: string,
-  globalsAbs: string,
-  fonts: FontEntry[],
-): string {
+function buildLocalFontFaceBlock(source: string, globalsAbs: string, fonts: FontEntry[]): string {
   const globalsDir = dirname(normalizePath(globalsAbs));
   const pkgRoot = normalizePath(inferCodemodTargetDir(globalsAbs));
   const chunks: string[] = [];
@@ -103,7 +99,7 @@ function buildLocalFontFaceBlock(
       const fmt = guessFontFormat(face.repoRelativePath);
       const lines: string[] = [
         markerComment,
-        `@font-face {`,
+        "@font-face {",
         `  font-family: '${escapeCssFamilyName(displayFamily)}';`,
         `  src: url('${escapeCssUrl(rel)}') format('${fmt}');`,
       ];
@@ -111,7 +107,7 @@ function buildLocalFontFaceBlock(
       if (face.style) lines.push(`  font-style: ${face.style};`);
       const disp = font.fontDisplay ?? "swap";
       lines.push(`  font-display: ${disp};`);
-      lines.push(`}`);
+      lines.push("}");
       chunks.push(lines.join("\n"));
     }
   }
@@ -154,7 +150,7 @@ function escapeCssUrl(s: string): string {
 function collectThemeLines(
   source: string,
   googleFonts: FontEntry[],
-  localFonts: FontEntry[],
+  localFonts: FontEntry[]
 ): string[] {
   const themeLines: string[] = [];
 
@@ -170,7 +166,7 @@ function collectThemeLines(
     const displayFamily = cssFontFamilyName(font);
     if (themeVarDeclared(source, varName)) continue;
     themeLines.push(
-      `  ${varName}: '${escapeCssFamilyName(displayFamily)}', ui-sans-serif, sans-serif;`,
+      `  ${varName}: '${escapeCssFamilyName(displayFamily)}', ui-sans-serif, sans-serif;`
     );
   }
 
@@ -182,7 +178,7 @@ function themeVarDeclared(source: string, varName: string): boolean {
 }
 
 function findThemeInlineBlockRange(
-  source: string,
+  source: string
 ): { bodyStart: number; closeBrace: number } | null {
   const m = source.match(/@theme\s+inline\s*\{/);
   if (!m || m.index === undefined) return null;
@@ -202,7 +198,7 @@ function findThemeInlineBlockRange(
 /** Insert new lines before the closing `}` of an existing `@theme inline` block. */
 function tryMergeThemeLines(
   source: string,
-  themeLines: string[],
+  themeLines: string[]
 ): { pos: number; text: string } | null {
   if (themeLines.length === 0) return null;
   const r = findThemeInlineBlockRange(source);
@@ -228,9 +224,10 @@ function familyDisplayName(raw: string): string {
 function findAfterLastImport(source: string): number {
   const rx = /^@import[^\n;]*;[ \t]*\n/gm;
   let lastEnd = 0;
-  let match: RegExpExecArray | null;
-  while ((match = rx.exec(source)) !== null) {
+  let match: RegExpExecArray | null = rx.exec(source);
+  while (match !== null) {
     lastEnd = match.index + match[0].length;
+    match = rx.exec(source);
   }
   return lastEnd;
 }

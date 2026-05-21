@@ -103,22 +103,19 @@ const codemod: Codemod<TSX> = async (root) => {
   s = s.replace(/^\/\/ TODO: remaining `next\/server`[^\n]*\r?\n/gm, "");
 
   s = stripViMockNextServer(s);
-  s = s.replace(
-    /^[ \t]*.*?vi\.importActual\s*\(\s*["']next\/server["']\)\s*;?\s*\r?\n/gm,
-    "",
-  );
+  s = s.replace(/^[ \t]*.*?vi\.importActual\s*\(\s*["']next\/server["']\)\s*;?\s*\r?\n/gm, "");
 
   s = s.replace(
     /^[ \t]*import\s+(?:type\s+)?\{[^}]*\}\s*from\s*["']next\/server["']\s*;?\s*\r?\n/gm,
-    "",
+    ""
   );
   s = s.replace(
     /^[ \t]*import\s+type\s+\{\s*NextRequest\s*\}\s*from\s*["']next\/server["']\s*;?\s*\r?\n/gm,
-    "",
+    ""
   );
   s = s.replace(
     /^[ \t]*import\s+type\s+\{\s*NextResponse\s*\}\s*from\s*["']next\/server["']\s*;?\s*\r?\n/gm,
-    "",
+    ""
   );
 
   const insertAt = findLastImportEnd(s);
@@ -126,9 +123,7 @@ const codemod: Codemod<TSX> = async (root) => {
 
   if (s === rootNode.text()) return null;
   const r = rootNode.range();
-  return rootNode.commitEdits([
-    { startPos: r.start.index, endPos: r.end.index, insertedText: s },
-  ]);
+  return rootNode.commitEdits([{ startPos: r.start.index, endPos: r.end.index, insertedText: s }]);
 };
 
 export default codemod;
@@ -151,18 +146,23 @@ function findLastImportEnd(s: string): number {
 function stripViMockNextServer(s: string): string {
   const re = /vi\.mock\s*\(\s*["']next\/server["']/g;
   let out = s;
-  let match: RegExpExecArray | null;
-  while ((match = re.exec(out)) !== null) {
+  let match: RegExpExecArray | null = re.exec(out);
+  while (match !== null) {
     const start = match.index;
     const openParen = out.indexOf("(", start);
     if (openParen === -1) break;
     const end = findMatchingCloseParen(out, openParen);
     if (end === -1) break;
     let after = end + 1;
-    while (after < out.length && /\s/.test(out[after]!)) after++;
+    while (after < out.length) {
+      const ch = out[after];
+      if (ch === undefined || !/\s/.test(ch)) break;
+      after++;
+    }
     if (out[after] === ";") after++;
     out = out.slice(0, start) + out.slice(after);
     re.lastIndex = start;
+    match = re.exec(out);
   }
   return out;
 }
@@ -174,7 +174,8 @@ function findMatchingCloseParen(src: string, openIdx: number): number {
   let lineComment = false;
   let blockComment = false;
   while (i < src.length) {
-    const ch = src[i]!;
+    const ch = src[i];
+    if (ch === undefined) break;
     const next = src[i + 1];
     if (lineComment) {
       if (ch === "\n") lineComment = false;

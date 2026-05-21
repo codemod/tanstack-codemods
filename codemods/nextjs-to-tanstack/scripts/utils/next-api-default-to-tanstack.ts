@@ -26,9 +26,7 @@ function indexOfMatchingParen(source: string, openParenIdx: number): number {
  *
  * Used when the JSSG runtime cannot safely walk the AST for very large route modules.
  */
-export function extractNextPagesApiDefaultHandlerBodyInner(
-  source: string,
-): string | null {
+export function extractNextPagesApiDefaultHandlerBodyInner(source: string): string | null {
   const m =
     /export\s+default\s+async\s+function\s+handler\s*\(/.exec(source) ??
     /export\s+default\s+function\s+handler\s*\(/.exec(source);
@@ -37,7 +35,11 @@ export function extractNextPagesApiDefaultHandlerBodyInner(
   const closeParen = indexOfMatchingParen(source, openParen);
   if (closeParen === -1) return null;
   let i = closeParen + 1;
-  while (i < source.length && /\s/.test(source[i]!)) i++;
+  while (i < source.length) {
+    const ch = source[i];
+    if (ch === undefined || !/\s/.test(ch)) break;
+    i++;
+  }
   if (source[i] !== "{") return null;
   const closeBrace = indexOfMatchingBrace(source, i);
   if (closeBrace === -1) return null;
@@ -51,24 +53,23 @@ export interface TransformNextApiBodyOptions {
 
 /** Strip `const { method } = req` and `if (method !== 'GET') { ...405... }` guard. */
 export function stripMethodGetGuard(source: string): string {
-  let s = source.replace(/^[\s\n]*const\s*\{\s*method\s*\}\s*=\s*req\s*;\s*/m, "");
-  const ifMatch = /^[\s\n]*if\s*\(\s*method\s*!==\s*["']GET["']\s*\)\s*\{/m.exec(
-    s,
-  );
+  const s = source.replace(/^[\s\n]*const\s*\{\s*method\s*\}\s*=\s*req\s*;\s*/m, "");
+  const ifMatch = /^[\s\n]*if\s*\(\s*method\s*!==\s*["']GET["']\s*\)\s*\{/m.exec(s);
   if (!ifMatch) return s;
   const openBrace = ifMatch.index + ifMatch[0].length - 1;
   const close = indexOfMatchingBrace(s, openBrace);
   if (close === -1) return s;
   let end = close + 1;
-  while (end < s.length && /\s/.test(s[end]!)) end++;
+  while (end < s.length) {
+    const ch = s[end];
+    if (ch === undefined || !/\s/.test(ch)) break;
+    end++;
+  }
   return s.slice(0, ifMatch.index) + s.slice(end);
 }
 
 /** Path segments like `/api/blog/$slug`: map `req.query` to `params` (plus dotted keys). */
-export function rewriteReqQueryToParams(
-  source: string,
-  hasPathParams: boolean,
-): string {
+export function rewriteReqQueryToParams(source: string, hasPathParams: boolean): string {
   if (!hasPathParams) {
     return rewriteReqQueryFromSearchParams(source);
   }
@@ -82,7 +83,7 @@ export function rewriteReqQueryToParams(
         .filter(Boolean);
       const line = parts.map((k) => `const ${k} = params.${k}`).join("\n");
       return line + (line ? ";" : "");
-    },
+    }
   );
   out = out.replace(/\breq\.query\.(\w+)/g, "params.$1");
   return out;
@@ -92,12 +93,10 @@ export function rewriteReqQueryToParams(
 export function rewriteReqQueryFromSearchParams(source: string): string {
   if (!/\breq\.query\b/.test(source)) return source;
   let out = source.replace(/^\s+/, "");
-  out =
-    "const query = Object.fromEntries(new URL(request.url).searchParams);\n" +
-    out;
+  out = `const query = Object.fromEntries(new URL(request.url).searchParams);\n${out}`;
   out = out.replace(
     /const\s*\{\s*([^}]+)\s*\}\s*=\s*req\.query\s*;/,
-    (_, keys: string) => `const { ${keys.trim()} } = query;`,
+    (_, keys: string) => `const { ${keys.trim()} } = query;`
   );
   out = out.replace(/\breq\.query\.(\w+)/g, "query.$1");
   out = out.replace(/\breq\.query\b/g, "query");
@@ -106,23 +105,24 @@ export function rewriteReqQueryFromSearchParams(source: string): string {
 
 /** Strip `if (req.method !== 'POST') { ... }`. */
 export function stripMethodNonPostGuard(source: string): string {
-  const ifMatch = /^[\s\n]*if\s*\(\s*req\.method\s*!==\s*["']POST["']\s*\)\s*\{/m.exec(
-    source,
-  );
+  const ifMatch = /^[\s\n]*if\s*\(\s*req\.method\s*!==\s*["']POST["']\s*\)\s*\{/m.exec(source);
   if (!ifMatch) return source;
   const openBrace = ifMatch.index + ifMatch[0].length - 1;
   const close = indexOfMatchingBrace(source, openBrace);
   if (close === -1) return source;
   let end = close + 1;
-  while (end < source.length && /\s/.test(source[end]!)) end++;
+  while (end < source.length) {
+    const ch = source[end];
+    if (ch === undefined || !/\s/.test(ch)) break;
+    end++;
+  }
   return source.slice(0, ifMatch.index) + source.slice(end);
 }
 
 export function rewriteReqBodyFromJson(source: string): string {
   if (!/\breq\.body\b/.test(source)) return source;
   let out = source.replace(/\breq\.body\b/g, "body");
-  out =
-    "const body = (await request.json()) as Record<string, unknown>;\n" + out;
+  out = `const body = (await request.json()) as Record<string, unknown>;\n${out}`;
   return out;
 }
 
@@ -143,13 +143,11 @@ function balancedParenEnd(s: string, openIdx: number): number {
 export function replaceResStatusJsonCalls(source: string): string {
   let result = source;
   for (let guard = 0; guard < 500; guard++) {
-    const m = /(?:return\s+)?\bres\.status\(\s*(\d+)\s*\)\s*\.\s*json\s*\(\s*/m.exec(
-      result,
-    );
+    const m = /(?:return\s+)?\bres\.status\(\s*(\d+)\s*\)\s*\.\s*json\s*\(\s*/m.exec(result);
     if (!m) {
       break;
     }
-    const status = m[1]!;
+    const status = m[1] ?? "200";
     const jsonOpenIdx = m.index + m[0].length - 1;
     if (result[jsonOpenIdx] !== "(") {
       break;
@@ -167,18 +165,16 @@ export function replaceResStatusJsonCalls(source: string): string {
 /** Replace `res.status(n).end(...)` (optional `return`). */
 export function replaceResStatusEndCalls(
   source: string,
-  options?: { allow405Method?: "GET" | "POST" },
+  options?: { allow405Method?: "GET" | "POST" }
 ): string {
   const allow405 = options?.allow405Method ?? "GET";
   let result = source;
   for (let guard = 0; guard < 100; guard++) {
-    const m = /(?:return\s+)?\bres\.status\(\s*(\d+)\s*\)\s*\.\s*end\s*\(\s*/m.exec(
-      result,
-    );
+    const m = /(?:return\s+)?\bres\.status\(\s*(\d+)\s*\)\s*\.\s*end\s*\(\s*/m.exec(result);
     if (!m) {
       break;
     }
-    const status = m[1]!;
+    const status = m[1] ?? "200";
     const openIdx = m.index + m[0].length - 1;
     if (result[openIdx] !== "(") {
       break;
@@ -195,9 +191,7 @@ export function replaceResStatusEndCalls(
   return result;
 }
 
-export function inferDefaultExportPagesApiKind(
-  bodyInner: string,
-): "GET" | "POST" {
+export function inferDefaultExportPagesApiKind(bodyInner: string): "GET" | "POST" {
   const t = bodyInner;
   if (/\breq\.body\b/.test(t)) return "POST";
   if (/req\.method\s*!==\s*["']POST["']/.test(t)) return "POST";
@@ -208,7 +202,7 @@ export function inferDefaultExportPagesApiKind(
 export function transformNextApiDefaultHandlerBody(
   bodyInner: string,
   options: TransformNextApiBodyOptions,
-  kind: "GET" | "POST",
+  kind: "GET" | "POST"
 ): string {
   let s = bodyInner.trim();
   if (kind === "POST") {

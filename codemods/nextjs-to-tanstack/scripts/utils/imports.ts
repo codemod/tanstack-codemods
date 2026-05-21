@@ -27,23 +27,18 @@ type RawFn = (program: unknown, options: unknown) => unknown;
 
 export function getImport<T extends TypesMap>(
   program: SgNode<T>,
-  options: GetOpts,
+  options: GetOpts
 ): ReturnType<typeof rawGetImport> {
-  return (rawGetImport as unknown as RawFn)(program, options) as ReturnType<
-    typeof rawGetImport
-  >;
+  return (rawGetImport as unknown as RawFn)(program, options) as ReturnType<typeof rawGetImport>;
 }
 
-export function addImport<T extends TypesMap>(
-  program: SgNode<T>,
-  options: AddOpts,
-): Edit | null {
+export function addImport<T extends TypesMap>(program: SgNode<T>, options: AddOpts): Edit | null {
   return (rawAddImport as unknown as RawFn)(program, options) as Edit | null;
 }
 
 export function removeImport<T extends TypesMap>(
   program: SgNode<T>,
-  options: RemoveOpts,
+  options: RemoveOpts
 ): Edit | null {
   return (rawRemoveImport as unknown as RawFn)(program, options) as Edit | null;
 }
@@ -51,7 +46,7 @@ export function removeImport<T extends TypesMap>(
 export function removeNamedImports<T extends TypesMap>(
   program: SgNode<T>,
   from: string,
-  specifiers: string[],
+  specifiers: string[]
 ): Edit[] {
   const edits: Edit[] = [];
   for (const name of specifiers) {
@@ -65,7 +60,7 @@ export function addNamedImport<T extends TypesMap>(
   program: SgNode<T>,
   from: string,
   name: string,
-  alias?: string,
+  alias?: string
 ): Edit | null {
   return addImport(program, {
     type: "named",
@@ -77,7 +72,7 @@ export function addNamedImport<T extends TypesMap>(
 export function addDefaultImport<T extends TypesMap>(
   program: SgNode<T>,
   from: string,
-  name: string,
+  name: string
 ): Edit | null {
   return addImport(program, { type: "default", name, from });
 }
@@ -87,7 +82,7 @@ export function addDefaultImport<T extends TypesMap>(
  * Replace affected `import { … } from "@tanstack/react-router"` statements with normal `, ` spacing.
  */
 export function tanstackRouterNamedImportCommaFixEdits<T extends TypesMap>(
-  program: SgNode<T>,
+  program: SgNode<T>
 ): Edit[] {
   const edits: Edit[] = [];
   const untyped = program as unknown as SgNode<TypesMap>;
@@ -111,10 +106,7 @@ export function tanstackRouterNamedImportCommaFixEdits<T extends TypesMap>(
  * `alias`. Use this to detect whether an import's local binding is actually
  * referenced before bothering to rewrite JSX.
  */
-export function programHasJsxUsage<T extends TypesMap>(
-  program: SgNode<T>,
-  alias: string,
-): boolean {
+export function programHasJsxUsage<T extends TypesMap>(program: SgNode<T>, alias: string): boolean {
   const untyped = program as unknown as SgNode<TypesMap>;
   const match = untyped.find({
     rule: {

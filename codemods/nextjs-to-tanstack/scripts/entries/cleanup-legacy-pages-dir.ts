@@ -13,28 +13,19 @@
 
 import type { Codemod } from "codemod:ast-grep";
 import type JSON_TYPES from "codemod:ast-grep/langs/json";
-import {
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  statSync,
-  writeFileSync,
-} from "fs";
+import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync, type Stats } from "fs";
 import { safeRemoveDir } from "../utils/safe-remove.ts";
 import { dirname, join } from "path";
-import {
-  emitWorkflowStepReport,
-  WORKFLOW_NODE_IDS,
-} from "../utils/migration-run-report.ts";
+import { emitWorkflowStepReport, WORKFLOW_NODE_IDS } from "../utils/migration-run-report.ts";
 import { getFilename, normalizePath } from "../utils/paths.ts";
 
 const BACKUP_SUBDIR = "migrated-from-pages";
 const README_NAME = "README.txt";
 const README_BODY =
-  `This folder was created by the nextjs-to-tanstack codemod.\n` +
-  `It holds files that still lived under Next.js pages/ after the automated migration.\n` +
-  `Port them into TanStack Start (routes under app/, server routes, loaders) and delete\n` +
-  `what you no longer need.\n`;
+  "This folder was created by the nextjs-to-tanstack codemod.\n" +
+  "It holds files that still lived under Next.js pages/ after the automated migration.\n" +
+  "Port them into TanStack Start (routes under app/, server routes, loaders) and delete\n" +
+  "what you no longer need.\n";
 
 type LegacyPagesDirOutcome = "absent" | "removed-empty" | "backed-up";
 
@@ -46,10 +37,13 @@ const codemod: Codemod<JSON_TYPES> = async (root) => {
 
   const pkgRoot = dirname(file);
 
-  const rootPages = handleLegacyPages(join(pkgRoot, "pages"), join(pkgRoot, BACKUP_SUBDIR, "root-pages"));
+  const rootPages = handleLegacyPages(
+    join(pkgRoot, "pages"),
+    join(pkgRoot, BACKUP_SUBDIR, "root-pages")
+  );
   const srcPages = handleLegacyPages(
     join(pkgRoot, "src/pages"),
-    join(pkgRoot, BACKUP_SUBDIR, "src-pages"),
+    join(pkgRoot, BACKUP_SUBDIR, "src-pages")
   );
 
   emitWorkflowStepReport({
@@ -69,7 +63,7 @@ export default codemod;
  * and remove the source tree.
  */
 function handleLegacyPages(pagesPath: string, backupDest: string): LegacyPagesDirOutcome {
-  let st;
+  let st: Stats;
   try {
     st = statSync(pagesPath);
   } catch {

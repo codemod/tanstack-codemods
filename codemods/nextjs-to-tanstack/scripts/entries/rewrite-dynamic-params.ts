@@ -68,14 +68,7 @@ const codemod: Codemod<TSX> = async (root) => {
 
   let removedAwaits = 0;
   for (const [varName, kind] of awaitKind) {
-    const awaitEdits = rewriteAwaitStatements(
-      pageFn,
-      varName,
-      kind,
-      isCatchAll,
-      rootNode,
-      source,
-    );
+    const awaitEdits = rewriteAwaitStatements(pageFn, varName, kind, isCatchAll, rootNode, source);
     edits.push(...awaitEdits);
     removedAwaits += countAwaitsOf(pageFn, varName);
   }
@@ -160,10 +153,7 @@ interface ParamStripResult {
   paramEdits: Edit[];
 }
 
-function stripNextParamDestructure(
-  fn: SgNode<TSX>,
-  _source: string,
-): ParamStripResult {
+function stripNextParamDestructure(fn: SgNode<TSX>, _source: string): ParamStripResult {
   const paramKind = new Set<"params" | "searchParams">();
   const paramEdits: Edit[] = [];
   void _source;
@@ -184,9 +174,7 @@ function stripNextParamDestructure(
     if (keysFound.length === 0) continue;
 
     const patternKeys = collectDestructureKeys(pattern);
-    const onlyNextKeys = patternKeys.every((k) =>
-      (PARAMS_NAMES as readonly string[]).includes(k),
-    );
+    const onlyNextKeys = patternKeys.every((k) => (PARAMS_NAMES as readonly string[]).includes(k));
 
     if (onlyNextKeys) {
       for (const k of keysFound) paramKind.add(k);
@@ -208,8 +196,8 @@ function stripNextParamDestructure(
       paramEdits.push(
         insertReviewBefore(
           fn,
-          "mixed destructure in page signature — verify Route.useParams() / Route.useSearch() usage by hand",
-        ),
+          "mixed destructure in page signature — verify Route.useParams() / Route.useSearch() usage by hand"
+        )
       );
       for (const k of keysFound) paramKind.add(k);
     }
@@ -245,7 +233,7 @@ function rewriteAwaitStatements(
   kind: "params" | "searchParams",
   isCatchAll: boolean,
   rootNode: SgNode<TSX>,
-  source: string,
+  source: string
 ): Edit[] {
   const edits: Edit[] = [];
   const handledDeclaratorAwaitIds = new Set<number>();
@@ -287,8 +275,8 @@ function rewriteAwaitStatements(
           edits.push(
             insertReviewBefore(
               decl,
-              "catch-all route destructure had multiple keys — rewrite to { _splat } by hand",
-            ),
+              "catch-all route destructure had multiple keys — rewrite to { _splat } by hand"
+            )
           );
         }
       }
@@ -367,7 +355,7 @@ function rewriteCatchAllJoinedParamRefs(pageFn: SgNode<TSX>, oldName: string): E
 function needsCatchAllArrayAliasAfterJoinRewrite(
   pageFn: SgNode<TSX>,
   oldKey: string,
-  decl: SgNode<TSX>,
+  decl: SgNode<TSX>
 ): boolean {
   for (const id of pageFn.findAll({
     rule: { kind: "identifier", regex: `^${escapeRxIdent(oldKey)}$` },
@@ -384,10 +372,7 @@ function escapeRxIdent(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function isIdentifierInCatchAllDestructuringPattern(
-  decl: SgNode<TSX>,
-  id: SgNode<TSX>,
-): boolean {
+function isIdentifierInCatchAllDestructuringPattern(decl: SgNode<TSX>, id: SgNode<TSX>): boolean {
   const pat = decl.field("name");
   if (!pat || pat.kind() !== "object_pattern") return false;
   let cur: SgNode<TSX> | null = id.parent();
@@ -432,20 +417,18 @@ function isOldKeyOnlyUsedAsJoinReceiver(id: SgNode<TSX>): boolean {
 function insertCatchAllArrayAliasAfterDeclarator(
   decl: SgNode<TSX>,
   oldKey: string,
-  source: string,
+  source: string
 ): Edit[] {
   let stmt: SgNode<TSX> | null = decl.parent();
-  while (
-    stmt &&
-    stmt.kind() !== "lexical_declaration" &&
-    stmt.kind() !== "variable_declaration"
-  ) {
+  while (stmt && stmt.kind() !== "lexical_declaration" && stmt.kind() !== "variable_declaration") {
     stmt = stmt.parent();
   }
   if (!stmt) return [];
   const indent = inferIndentAfterNewline(source, stmt.range().start.index);
   const insert = `\n${indent}const ${oldKey} = _splat.split("/").filter(Boolean);`;
-  return [{ startPos: stmt.range().end.index, endPos: stmt.range().end.index, insertedText: insert }];
+  return [
+    { startPos: stmt.range().end.index, endPos: stmt.range().end.index, insertedText: insert },
+  ];
 }
 
 function inferIndentAfterNewline(source: string, stmtStart: number): string {

@@ -32,9 +32,7 @@ const TYPE_STUB_EXPORTS = new Set([
   "ImageResponseOptions",
 ]);
 
-const UNSUPPORTED = [
-  /\bNextResponse\.next\b/,
-];
+const UNSUPPORTED = [/\bNextResponse\.next\b/];
 
 type StripAccumulator = {
   afterLocals: Set<string>;
@@ -145,11 +143,12 @@ const codemod: Codemod<TSX> = async (root) => {
     if (obj.text() !== "NextResponse" && obj.text() !== "Response") continue;
     if (prop !== "rewrite") continue;
     const argsText = call.field("arguments")?.text() ?? "";
-    const argExpr = argsText.replace(/^\(\s*/, "").replace(/\s*\)$/, "").trim();
+    const argExpr = argsText
+      .replace(/^\(\s*/, "")
+      .replace(/\s*\)$/, "")
+      .trim();
     if (!argExpr) continue;
-    edits.push(
-      call.replace(`Response.redirect(${argExpr}.toString(), 307)`),
-    );
+    edits.push(call.replace(`Response.redirect(${argExpr}.toString(), 307)`));
   }
 
   if (acc.afterLocals.size > 0 || acc.connectionLocals.size > 0) {
@@ -167,11 +166,11 @@ const codemod: Codemod<TSX> = async (root) => {
   const out2 = out
     .replace(
       /\b(?:NextResponse|Response)\.rewrite\(\s*([A-Za-z_$][A-Za-z0-9_$]*)\s*\)/g,
-      "Response.redirect($1.toString(), 307)",
+      "Response.redirect($1.toString(), 307)"
     )
     .replace(
       /\b(?:NextResponse|Response)\.rewrite\(\s*new URL\(([^)]+)\)\s*\)/g,
-      "Response.redirect(new URL($1).toString(), 307)",
+      "Response.redirect(new URL($1).toString(), 307)"
     );
   return stripLeadingBlankLines(out2);
 };
@@ -179,17 +178,14 @@ const codemod: Codemod<TSX> = async (root) => {
 export default codemod;
 
 function buildServerRuntimeShimBlock(acc: StripAccumulator): string {
-  const doc =
-    "https://tanstack.com/start/latest/docs/framework/react/guide/server-routes";
+  const doc = "https://tanstack.com/start/latest/docs/framework/react/guide/server-routes";
   const lines: string[] = [];
   lines.push(
-    `${TODO_PREFIX}next/server \`after\` / \`connection\` — minimal Promise shims; verify semantics vs Next (logging, dynamic rendering) — ${doc}\n`,
+    `${TODO_PREFIX}next/server \`after\` / \`connection\` — minimal Promise shims; verify semantics vs Next (logging, dynamic rendering) — ${doc}\n`
   );
 
   for (const name of [...acc.afterLocals].sort()) {
-    lines.push(
-      `const ${name} = (cb: () => unknown) => { void Promise.resolve().then(cb); };`,
-    );
+    lines.push(`const ${name} = (cb: () => unknown) => { void Promise.resolve().then(cb); };`);
   }
 
   for (const name of [...acc.connectionLocals].sort()) {
@@ -266,7 +262,11 @@ function buildNextServerImportRewrite(stmtText: string, acc: StripAccumulator): 
       removedNextPrimitive = true;
       continue;
     }
-    if (exported === "userAgent" || exported === "userAgentFromString" || exported === "UserAgent") {
+    if (
+      exported === "userAgent" ||
+      exported === "userAgentFromString" ||
+      exported === "UserAgent"
+    ) {
       uaSpecs.push(t);
       continue;
     }
@@ -311,11 +311,7 @@ function buildNextServerImportRewrite(stmtText: string, acc: StripAccumulator): 
   };
 }
 
-function buildTypeImportRewrite(
-  stmtText: string,
-  specs: string[],
-  head: string,
-): ImportPlan {
+function buildTypeImportRewrite(stmtText: string, specs: string[], head: string): ImportPlan {
   const stubs: { exported: string; local: string }[] = [];
   const remainder: string[] = [];
   let removedNextPrimitive = false;
@@ -338,8 +334,7 @@ function buildTypeImportRewrite(
     remainder.push(t);
   }
 
-  const doc =
-    "https://tanstack.com/start/latest/docs/framework/react/guide/server-routes";
+  const doc = "https://tanstack.com/start/latest/docs/framework/react/guide/server-routes";
 
   if (remainder.length === 0 && stubs.length === 0) {
     return { kind: "delete", removedNextPrimitive };
@@ -377,11 +372,14 @@ function buildTypeImportRewrite(
 function specifierMeta(raw: string): { exported: string; local: string } | null {
   const t = raw.trim();
   const ta = /^type\s+([A-Za-z0-9_]+)(?:\s+as\s+(?:type\s+)?([A-Za-z0-9_]+))?$/.exec(t);
-  if (ta) return { exported: ta[1]!, local: ta[2] ?? ta[1]! };
-  const id =
-    /^([A-Za-z0-9_]+)(?:\s+as\s+(?:type\s+)?([A-Za-z0-9_]+))?$/.exec(t);
+  if (ta) {
+    const exported = ta[1] ?? "";
+    return { exported, local: ta[2] ?? exported };
+  }
+  const id = /^([A-Za-z0-9_]+)(?:\s+as\s+(?:type\s+)?([A-Za-z0-9_]+))?$/.exec(t);
   if (!id) return null;
-  return { exported: id[1]!, local: id[2] ?? id[1]! };
+  const exported = id[1] ?? "";
+  return { exported, local: id[2] ?? exported };
 }
 
 function splitSpecs(inner: string): string[] {

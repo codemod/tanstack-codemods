@@ -13,9 +13,7 @@ import type { Codemod } from "codemod:ast-grep";
 import type TSX from "codemod:ast-grep/langs/tsx";
 import { readFileSync, writeFileSync } from "fs";
 import { getFilename, normalizePath } from "../utils/paths.ts";
-import {
-  applyRepairRouteTailPipeline,
-} from "../utils/strip-next-pages-data.ts";
+import { applyRepairRouteTailPipeline } from "../utils/strip-next-pages-data.ts";
 
 const codemod: Codemod<TSX> = async (root) => {
   const file = normalizePath(getFilename(root));
@@ -48,6 +46,8 @@ const codemod: Codemod<TSX> = async (root) => {
 export default codemod;
 
 function isAppRouteModule(file: string): boolean {
-  return /(^|\/)src\/app\/.*\.(tsx|ts|jsx|js)$/.test(file) ||
-    /(^|\/)app\/.*\.(tsx|ts|jsx|js)$/.test(file);
+  return (
+    /(^|\/)src\/app\/.*\.(tsx|ts|jsx|js)$/.test(file) ||
+    /(^|\/)app\/.*\.(tsx|ts|jsx|js)$/.test(file)
+  );
 }

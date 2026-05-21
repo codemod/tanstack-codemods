@@ -38,7 +38,7 @@ function relinkSpecifier(spec: string, oldDir: string, newDir: string): string {
 export function rewriteRelativeImportsAfterFileMove(
   source: string,
   oldFileAbs: string,
-  newFileAbs: string,
+  newFileAbs: string
 ): string {
   const oldDir = dirname(normalizePath(oldFileAbs));
   const newDir = dirname(normalizePath(newFileAbs));
@@ -53,13 +53,19 @@ export function rewriteRelativeImportsAfterFileMove(
     const n = relinkSpecifier(spec, oldDir, newDir);
     return n === spec ? full : `import ${q}${n}${q}`;
   });
-  s = s.replace(/\bimport\s*\(\s*(["'])(\.\.?\/[^"']+)\1\s*\)/g, (full, q: string, spec: string) => {
-    const n = relinkSpecifier(spec, oldDir, newDir);
-    return n === spec ? full : `import(${q}${n}${q})`;
-  });
-  s = s.replace(/\brequire\s*\(\s*(["'])(\.\.?\/[^"']+)\1\s*\)/g, (full, q: string, spec: string) => {
-    const n = relinkSpecifier(spec, oldDir, newDir);
-    return n === spec ? full : `require(${q}${n}${q})`;
-  });
+  s = s.replace(
+    /\bimport\s*\(\s*(["'])(\.\.?\/[^"']+)\1\s*\)/g,
+    (full, q: string, spec: string) => {
+      const n = relinkSpecifier(spec, oldDir, newDir);
+      return n === spec ? full : `import(${q}${n}${q})`;
+    }
+  );
+  s = s.replace(
+    /\brequire\s*\(\s*(["'])(\.\.?\/[^"']+)\1\s*\)/g,
+    (full, q: string, spec: string) => {
+      const n = relinkSpecifier(spec, oldDir, newDir);
+      return n === spec ? full : `require(${q}${n}${q})`;
+    }
+  );
   return s;
 }

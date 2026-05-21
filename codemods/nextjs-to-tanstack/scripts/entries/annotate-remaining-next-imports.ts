@@ -7,10 +7,7 @@
 import type { Codemod, Edit } from "codemod:ast-grep";
 import type TSX from "codemod:ast-grep/langs/tsx";
 import { useMetricAtom } from "codemod:metrics";
-import {
-  bumpR10bFromModules,
-  bumpR10bMiddlewareFile,
-} from "../utils/migration-run-report.ts";
+import { bumpR10bFromModules, bumpR10bMiddlewareFile } from "../utils/migration-run-report.ts";
 import { collapseDuplicateTrailingExportClosures } from "../utils/eof-closure-cleanup.ts";
 import { getFilename, normalizePath } from "../utils/paths.ts";
 import { hasTodoSentinel, insertTodoBefore, TODO_PREFIX } from "../utils/sentinels.ts";
@@ -97,8 +94,7 @@ function parseImportSource(statementText: string): string | null {
 }
 
 function todoForNextSpecifier(from: string): { message: string; docUrl?: string } {
-  const serverRoutes =
-    "https://tanstack.com/start/latest/docs/framework/react/guide/server-routes";
+  const serverRoutes = "https://tanstack.com/start/latest/docs/framework/react/guide/server-routes";
 
   if (from === "next/headers") {
     return {

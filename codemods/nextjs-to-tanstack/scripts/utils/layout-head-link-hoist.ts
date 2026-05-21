@@ -64,7 +64,7 @@ function escapeRegexIdent(s: string): string {
 
 export function extractLayoutHeadStyleLinks(
   rootNode: SgNode,
-  source: string,
+  source: string
 ): LayoutHeadLinkHoistResult {
   const linkItems: string[] = [];
   const removals: Edit[] = [];
@@ -93,7 +93,7 @@ export function extractLayoutHeadStyleLinks(
     const { start: lineStart, end: lineEnd } = extendRemovalToFullLines(
       source,
       rootEl.range().start.index,
-      rootEl.range().end.index,
+      rootEl.range().end.index
     );
     removals.push({
       startPos: lineStart,
@@ -108,7 +108,7 @@ export function extractLayoutHeadStyleLinks(
 function extendRemovalToFullLines(
   source: string,
   elementStart: number,
-  elementEnd: number,
+  elementEnd: number
 ): { start: number; end: number } {
   let start = elementStart;
   while (start > 0) {
@@ -130,10 +130,7 @@ function extendRemovalToFullLines(
 }
 
 /** Append stylesheet `links` entry for the file's `*.css?url` default import binding. */
-export function appendCssUrlStylesheetToLinkItems(
-  linkItems: string[],
-  rootNode: SgNode,
-): void {
+export function appendCssUrlStylesheetToLinkItems(linkItems: string[], rootNode: SgNode): void {
   const binding = findCssUrlDefaultBinding(rootNode);
   if (!binding) return;
   const hrefRe = hrefUsesBindingRegex(binding);
@@ -150,7 +147,7 @@ export function tryMergeCssUrlBindingIntoExistingHead(
   source: string,
   rootNode: SgNode,
   appRelativePath: string,
-  configObj: SgNode,
+  configObj: SgNode
 ): Edit | null {
   const binding = findCssUrlDefaultBinding(rootNode);
   if (!isTanstackAppRootFile(appRelativePath) || !binding) {
@@ -200,7 +197,7 @@ export function tryMergeCssUrlBindingIntoExistingHead(
 function findMatchingBraceClose(
   source: string,
   openBraceIdx: number,
-  limit: number,
+  limit: number
 ): number | null {
   let depth = 0;
   for (let i = openBraceIdx; i < limit; i++) {
@@ -217,7 +214,7 @@ function findMatchingBraceClose(
 function findMatchingBracketClose(
   source: string,
   openBracketIdx: number,
-  limit: number,
+  limit: number
 ): number | null {
   let depth = 0;
   for (let i = openBracketIdx; i < limit; i++) {
@@ -263,10 +260,7 @@ function shouldHoistStyleLink(rel: string | null, asVal: string | null): boolean
   return false;
 }
 
-function readLowercaseStringAttr(
-  attrs: SgNode[],
-  prop: string,
-): string | null {
+function readLowercaseStringAttr(attrs: SgNode[], prop: string): string | null {
   const raw = readStringAttr(attrs, prop);
   return raw === null ? null : raw.toLowerCase();
 }
@@ -362,5 +356,5 @@ function formatAttrForLinkObject(key: string, val: SgNode): string | null {
 function jsxExpressionInnerSource(node: SgNode): string | null {
   const t = node.text();
   const m = /^\{\s*([\s\S]*?)\s*\}$/.exec(t);
-  return m ? m[1]!.trim() : null;
+  return m ? (m[1]?.trim() ?? null) : null;
 }

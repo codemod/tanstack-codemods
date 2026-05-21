@@ -44,9 +44,7 @@ export function composeHeadOption(metaItems: string[], linkItems: string[]): str
 /**
  * Collect TanStack `meta` / `links` entries from a Next.js `metadata` object.
  */
-export function metadataObjectToHeadParts<T extends TypesMap>(
-  objTyped: SgNode<T>,
-): HeadParts {
+export function metadataObjectToHeadParts<T extends TypesMap>(objTyped: SgNode<T>): HeadParts {
   const objNode = objTyped as unknown as AnyNode;
   const metaItems: string[] = [];
   const linkItems: string[] = [];
@@ -79,9 +77,7 @@ export function metadataObjectToHeadParts<T extends TypesMap>(
       case "keywords": {
         const items = readStringArray(value);
         if (items !== null) {
-          metaItems.push(
-            `{ name: "keywords", content: ${JSON.stringify(items.join(","))} }`,
-          );
+          metaItems.push(`{ name: "keywords", content: ${JSON.stringify(items.join(","))} }`);
         } else {
           unmapped.push("keywords (non-literal array)");
         }
@@ -126,9 +122,7 @@ export function metadataObjectToHeadParts<T extends TypesMap>(
  * Build a `head()` option string from a metadata object AST node. The caller
  * is expected to have already verified that the node is an `object`.
  */
-export function metadataObjectToHead<T extends TypesMap>(
-  objTyped: SgNode<T>,
-): HeadBuildResult {
+export function metadataObjectToHead<T extends TypesMap>(objTyped: SgNode<T>): HeadBuildResult {
   const parts = metadataObjectToHeadParts(objTyped);
   return {
     headOption: composeHeadOption(parts.metaItems, parts.linkItems),
@@ -188,13 +182,11 @@ function pushMeta(
   metaName: string,
   value: AnyNode,
   unmapped: string[],
-  unmappedLabel: string,
+  unmappedLabel: string
 ): void {
   const str = readStringLiteral(value);
   if (str !== null) {
-    out.push(
-      `{ ${attr}: ${JSON.stringify(metaName)}, content: ${JSON.stringify(str)} }`,
-    );
+    out.push(`{ ${attr}: ${JSON.stringify(metaName)}, content: ${JSON.stringify(str)} }`);
     return;
   }
   unmapped.push(`${unmappedLabel} (non-literal value)`);
@@ -204,7 +196,7 @@ function collectNested(
   objNode: AnyNode,
   prefix: string,
   metaItems: string[],
-  unmapped: string[],
+  unmapped: string[]
 ): void {
   const attr = prefix === "og:" ? ("property" as const) : ("name" as const);
   for (const pair of objNode.findAll({ rule: { kind: "pair" } })) {
@@ -218,14 +210,14 @@ function collectNested(
       if (arr !== null) {
         for (const img of arr) {
           metaItems.push(
-            `{ ${attr}: ${JSON.stringify(`${prefix}image`)}, content: ${JSON.stringify(img)} }`,
+            `{ ${attr}: ${JSON.stringify(`${prefix}image`)}, content: ${JSON.stringify(img)} }`
           );
         }
       } else {
         const single = readStringLiteral(value);
         if (single !== null) {
           metaItems.push(
-            `{ ${attr}: ${JSON.stringify(`${prefix}image`)}, content: ${JSON.stringify(single)} }`,
+            `{ ${attr}: ${JSON.stringify(`${prefix}image`)}, content: ${JSON.stringify(single)} }`
           );
         } else {
           unmapped.push(`${prefix}images (non-literal)`);

@@ -25,7 +25,7 @@
  * detected on disk so `page.tsx` maps to a folder `index.tsx` instead of a colliding flat `segment.tsx`.
  */
 
-import { readdirSync, statSync } from "fs";
+import { readdirSync, statSync, type Stats } from "fs";
 import { basename, dirname, join } from "path";
 
 export type NextFileKind = "layout" | "page" | "route" | "other";
@@ -109,7 +109,9 @@ export interface SpecialRouteFileResult {
   variant: SpecialRouteFileVariant;
 }
 
-export function classifySpecialRouteFileBasename(fileName: string | undefined): SpecialRouteFileVariant | null {
+export function classifySpecialRouteFileBasename(
+  fileName: string | undefined
+): SpecialRouteFileVariant | null {
   if (!fileName) return null;
   if (/^loading\.(t|j)sx?$/.test(fileName)) return "loading";
   if (/^error\.(t|j)sx?$/.test(fileName)) return "error";
@@ -145,27 +147,38 @@ const translateSegment = (seg: string): SegmentTranslation => {
 
   const catchAll = SEG_CATCHALL.exec(seg);
   if (catchAll) {
-    return { text: "$", dynamic: catchAll[1] ?? null, catchAll: true, optionalCatchAll: false, group: false };
+    return {
+      text: "$",
+      dynamic: catchAll[1] ?? null,
+      catchAll: true,
+      optionalCatchAll: false,
+      group: false,
+    };
   }
 
   const dynamic = SEG_DYNAMIC.exec(seg);
   if (dynamic) {
     const name = dynamic[1] ?? "";
-    return { text: `$${name}`, dynamic: name, catchAll: false, optionalCatchAll: false, group: false };
+    return {
+      text: `$${name}`,
+      dynamic: name,
+      catchAll: false,
+      optionalCatchAll: false,
+      group: false,
+    };
   }
 
   return { text: seg, dynamic: null, catchAll: false, optionalCatchAll: false, group: false };
 };
 
-const NEXT_METADATA_IMAGE_FILE =
-  /^(opengraph-image|twitter-image)\.(m|c)?(t|j)sx?$/i;
+const NEXT_METADATA_IMAGE_FILE = /^(opengraph-image|twitter-image)\.(m|c)?(t|j)sx?$/i;
 
 /**
  * Map `app/.../opengraph-image.tsx` (or `twitter-image`) to `app/.../opengraph.tsx`
  * (or `twitter.tsx`) with `$param` segments. Route id ends with `/opengraph` or `/twitter`.
  */
 export function computeMetadataImageTransform(
-  relativePath: string,
+  relativePath: string
 ): MetadataImageRouteResult | null {
   const appSplit = stripAppPrefix(relativePath);
   if (!appSplit) return null;
@@ -195,9 +208,7 @@ export function computeMetadataImageTransform(
   }
 
   const routePath =
-    translated.length === 0
-      ? `/${routeLeaf}`
-      : `/${translated.join("/")}/${routeLeaf}`;
+    translated.length === 0 ? `/${routeLeaf}` : `/${translated.join("/")}/${routeLeaf}`;
   const dirPart = translated.length ? `${translated.join("/")}/` : "";
   const newPath = `${head}/${dirPart}${outLeaf}`;
   return { newPath, routePath };
@@ -228,7 +239,7 @@ function pageSourceDirHasTanStackRouteSiblings(pageSourceFileAbsolutePath: strin
     if (name === selfName) continue;
 
     const full = join(dir, name);
-    let st;
+    let st: Stats;
     try {
       st = statSync(full);
     } catch {
@@ -256,7 +267,9 @@ function pageSourceDirHasTanStackRouteSiblings(pageSourceFileAbsolutePath: strin
  *
  * Mirrors conventions from `/Users/amir/Desktop/codemod/next2tanstack`.
  */
-export function computeSpecialRouteFileTransform(relativePath: string): SpecialRouteFileResult | null {
+export function computeSpecialRouteFileTransform(
+  relativePath: string
+): SpecialRouteFileResult | null {
   const appSplit = stripAppPrefix(relativePath);
   const pagesSplit = appSplit ? null : stripPagesPrefix(relativePath);
   const split = appSplit ?? pagesSplit;
@@ -269,7 +282,7 @@ export function computeSpecialRouteFileTransform(relativePath: string): SpecialR
   if (!variant) return null;
 
   const dirSegs = rest.slice(0, -1);
-  const ext = fileName!.slice(fileName!.indexOf("."));
+  const ext = fileName?.slice(fileName?.indexOf("."));
 
   for (const seg of dirSegs) {
     if (seg.startsWith("@")) return null;
@@ -321,7 +334,7 @@ export function computeSpecialRouteFileTransform(relativePath: string): SpecialR
  */
 export function computeRoutePath(
   relativePath: string,
-  pageSourceAbsPath?: string,
+  pageSourceAbsPath?: string
 ): RoutePathResult | null {
   const appSplit = stripAppPrefix(relativePath);
   if (appSplit) {
@@ -337,7 +350,7 @@ export function computeRoutePath(
 function computeAppRouterRoutePath(
   _relativePath: string,
   split: { head: string; rest: string[] },
-  pageSourceAbsPath?: string,
+  pageSourceAbsPath?: string
 ): RoutePathResult | null {
   const { head, rest } = split;
 
@@ -347,17 +360,19 @@ function computeAppRouterRoutePath(
 
   // `app/api/hello.ts`, `app/api/blog/$slug.ts` (TanStack/flat API modules — not `route.ts`)
   if (kind === "other") {
-    const ext = fileName!.slice(fileName!.indexOf("."));
+    const ext = fileName?.slice(fileName?.indexOf("."));
     if (
       dirSegs[0] === "api" &&
+      fileName &&
+      ext &&
       /\.(m|c)?tsx?$|\.(m|c)?jsx?$|\.(m)?ts$/.test(ext)
     ) {
-      return computeAppRouterApiLeafModule(head, dirSegs, fileName!, ext);
+      return computeAppRouterApiLeafModule(head, dirSegs, fileName, ext);
     }
     return null;
   }
 
-  const ext = fileName!.slice(fileName!.indexOf("."));
+  const ext = fileName?.slice(fileName?.indexOf("."));
 
   if (kind === "layout") {
     if (dirSegs.length !== 0) return null; // nested layouts are not handled here
@@ -454,7 +469,7 @@ function computeAppRouterApiLeafModule(
   head: string,
   dirSegs: string[],
   fileName: string,
-  ext: string,
+  ext: string
 ): RoutePathResult | null {
   const baseName = fileName.slice(0, fileName.indexOf("."));
   const stemSegments = [...dirSegs, baseName];
@@ -470,7 +485,8 @@ function computeAppRouterApiLeafModule(
     if (t.dynamic) dynamicName = t.dynamic;
   }
   const parentDir = translated.slice(0, -1);
-  const leaf = translated.at(-1)!;
+  const leaf = translated.at(-1);
+  if (leaf === undefined) return null;
   const newDir = parentDir.length === 0 ? head : `${head}/${parentDir.join("/")}`;
   const routeDir = parentDir.length === 0 ? "" : `/${parentDir.join("/")}`;
   return {
@@ -490,27 +506,22 @@ function computePagesRouterRoutePath(
     head: string;
     rest: string[];
   },
-  pageSourceAbsPath?: string,
+  pageSourceAbsPath?: string
 ): RoutePathResult | null {
   const { head, rest } = split;
   if (rest.length === 0) return null;
 
-  const fileName = rest.at(-1)!;
+  const fileName = rest.at(-1);
+  if (fileName === undefined) return null;
   const dirSegs = rest.slice(0, -1);
   const ext = fileName.slice(fileName.indexOf("."));
   const baseName = fileName.slice(0, fileName.indexOf("."));
 
-  if (
-    /^(?:_app|_document|_middleware)$/.test(baseName) &&
-    /\.(?:t|j)sx?$/.test(ext)
-  ) {
+  if (/^(?:_app|_document|_middleware)$/.test(baseName) && /\.(?:t|j)sx?$/.test(ext)) {
     return null;
   }
 
-  if (
-    /^_error$/.test(baseName) &&
-    /\.(?:t|j)sx?$/.test(ext)
-  ) {
+  if (/^_error$/.test(baseName) && /\.(?:t|j)sx?$/.test(ext)) {
     return null;
   }
 
@@ -534,7 +545,8 @@ function computePagesRouterRoutePath(
       if (t.dynamic) dynamicName = t.dynamic;
     }
     const parentDir = translated.slice(0, -1);
-    const leaf = translated.at(-1)!;
+    const leaf = translated.at(-1);
+    if (leaf === undefined) return null;
     const newDir = parentDir.length === 0 ? targetHead : `${targetHead}/${parentDir.join("/")}`;
     const routeDir = parentDir.length === 0 ? "" : `/${parentDir.join("/")}`;
     return {
@@ -573,7 +585,8 @@ function computePagesRouterRoutePath(
       };
     }
     const parentDir = translated.slice(0, -1);
-    const leaf = translated.at(-1)!;
+    const leaf = translated.at(-1);
+    if (leaf === undefined) return null;
     const newDir = parentDir.length === 0 ? targetHead : `${targetHead}/${parentDir.join("/")}`;
     const routeDir = parentDir.length === 0 ? "" : `/${parentDir.join("/")}`;
     const splatRoutePath = `${routeDir}/${leaf}`;
@@ -623,8 +636,8 @@ function computePagesRouterRoutePath(
   }
 
   const parentDir = translated.slice(0, -1);
-  const leaf = translated.at(-1)!;
-  if (translated.length === 0) return null;
+  const leaf = translated.at(-1);
+  if (leaf === undefined || translated.length === 0) return null;
 
   const newDir = parentDir.length === 0 ? targetHead : `${targetHead}/${parentDir.join("/")}`;
   const routeDir = parentDir.length === 0 ? "" : `/${parentDir.join("/")}`;

@@ -21,10 +21,7 @@ type AnyNode = SgNode<TypesMap>;
  * The comment inherits the node's column indentation so multi-line blocks
  * stay visually aligned.
  */
-export function insertReviewBefore<T extends TypesMap>(
-  node: SgNode<T>,
-  message: string,
-): Edit {
+export function insertReviewBefore<T extends TypesMap>(node: SgNode<T>, message: string): Edit {
   return buildLeadingCommentEdit(node as unknown as AnyNode, `${REVIEW_PREFIX}${message}`);
 }
 
@@ -33,7 +30,7 @@ export function insertTodoBefore<T extends TypesMap>(
   message: string,
   docUrl?: string,
   /** Prefer ASCII (e.g. `" - "`) when edits must align with JS string indices in TSX. */
-  docJoiner = " — ",
+  docJoiner = " — "
 ): Edit {
   const body = docUrl ? `${message}${docJoiner}${docUrl}` : message;
   return buildLeadingCommentEdit(node as unknown as AnyNode, `${TODO_PREFIX}${body}`);
@@ -59,7 +56,7 @@ function buildLeadingCommentEdit(node: AnyNode, commentLine: string): Edit {
 export function hasReviewSentinel<T extends TypesMap>(
   source: string,
   node: SgNode<T>,
-  needle?: string,
+  needle?: string
 ): boolean {
   return hasSentinel(source, node as unknown as AnyNode, REVIEW_PREFIX, needle);
 }
@@ -67,7 +64,7 @@ export function hasReviewSentinel<T extends TypesMap>(
 export function hasTodoSentinel<T extends TypesMap>(
   source: string,
   node: SgNode<T>,
-  needle?: string,
+  needle?: string
 ): boolean {
   return hasSentinel(source, node as unknown as AnyNode, TODO_PREFIX, needle);
 }

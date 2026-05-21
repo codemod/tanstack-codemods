@@ -33,11 +33,8 @@ const codemod: Codemod<JSON_TYPES> = async (root) => {
     return null;
   }
 
-  const useSrc =
-    hasSrcAppOrPages(repoRoot) || fileExists(join(repoRoot, "src/router.tsx"));
-  const rootPath = useSrc
-    ? join(repoRoot, "src/app/__root.tsx")
-    : join(repoRoot, "app/__root.tsx");
+  const useSrc = hasSrcAppOrPages(repoRoot) || fileExists(join(repoRoot, "src/router.tsx"));
+  const rootPath = useSrc ? join(repoRoot, "src/app/__root.tsx") : join(repoRoot, "app/__root.tsx");
 
   if (fileExists(rootPath)) {
     return null;
@@ -45,24 +42,7 @@ const codemod: Codemod<JSON_TYPES> = async (root) => {
 
   mkdirSync(dirname(rootPath), { recursive: true });
   const globalsUrl = resolveGlobalsCssUrlImport(rootPath);
-  const contents =
-    `import { Outlet, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";\n` +
-    `import appCss from "${globalsUrl}";\n\n` +
-    `// TODO: Replace this placeholder root route with your real layout (fonts, providers, html/body shell).\n` +
-    `export const Route = createRootRoute({\n  component: RootLayout,\n});\n\n` +
-    `function RootLayout() {\n` +
-    `  return (\n` +
-    `    <html lang="en">\n` +
-    `      <head>\n` +
-    `        <HeadContent />\n` +
-    `      </head>\n` +
-    `      <body>\n` +
-    `        <Outlet />\n` +
-    `        <Scripts />\n` +
-    `      </body>\n` +
-    `    </html>\n` +
-    `  );\n` +
-    `}\n`;
+  const contents = `import { Outlet, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";\nimport appCss from "${globalsUrl}";\n\n// TODO: Replace this placeholder root route with your real layout (fonts, providers, html/body shell).\nexport const Route = createRootRoute({\n  component: RootLayout,\n});\n\nfunction RootLayout() {\n  return (\n    <html lang="en">\n      <head>\n        <HeadContent />\n      </head>\n      <body>\n        <Outlet />\n        <Scripts />\n      </body>\n    </html>\n  );\n}\n`;
   writeFileSync(rootPath, contents);
   return null;
 };

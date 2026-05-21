@@ -10,10 +10,7 @@ import type JSON_TYPES from "codemod:ast-grep/langs/json";
 import { readFileSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { hasSrcAppOrPages } from "../utils/has-src-app-or-pages.ts";
-import {
-  emitWorkflowStepReport,
-  WORKFLOW_NODE_IDS,
-} from "../utils/migration-run-report.ts";
+import { emitWorkflowStepReport, WORKFLOW_NODE_IDS } from "../utils/migration-run-report.ts";
 import { getFilename, normalizePath } from "../utils/paths.ts";
 import { readCodemodI18nJson } from "../utils/read-next-i18n-config.ts";
 import { writeI18nBootstrapIfAbsent } from "../utils/write-i18n-bootstrap.ts";
@@ -78,15 +75,15 @@ const codemod: Codemod<JSON_TYPES> = async (root) => {
   }
 
   if (!/from\s+["']react-i18next["']/.test(src)) {
-    src =
-      `import { I18nextProvider } from "react-i18next";\n` +
-      `import i18n from "${i18nModulePath}";\n` +
-      src;
+    src = `import { I18nextProvider } from "react-i18next";\nimport i18n from "${i18nModulePath}";\n${src}`;
   } else if (!/\bimport\s+i18n\s+from\s+["']/.test(src)) {
-    src = `import i18n from "${i18nModulePath}";\n` + src;
+    src = `import i18n from "${i18nModulePath}";\n${src}`;
   }
 
-  const patched = src.replace(outletRe, (m) => `<I18nextProvider i18n={i18n}>${m}</I18nextProvider>`);
+  const patched = src.replace(
+    outletRe,
+    (m) => `<I18nextProvider i18n={i18n}>${m}</I18nextProvider>`
+  );
   if (patched === src) {
     report.notes.push("Outlet replace produced no change");
     emitWorkflowStepReport(report);
@@ -100,7 +97,7 @@ const codemod: Codemod<JSON_TYPES> = async (root) => {
   if (readableFile(routerFile)) {
     let r = readFileSync(routerFile, "utf8");
     if (!/\bimport\s+["']\.?\/?i18n["']/.test(r) && !r.includes('from "./i18n"')) {
-      r = `import "./i18n";\n` + r;
+      r = `import "./i18n";\n${r}`;
       writeFileSync(routerFile, r);
       report.preloadedI18nImportInRouter = true;
     } else {

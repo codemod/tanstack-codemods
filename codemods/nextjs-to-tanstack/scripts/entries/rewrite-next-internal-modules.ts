@@ -35,12 +35,12 @@ const codemod: Codemod<TSX> = async (root) => {
     this.statusCode = statusCode;
   }
 }
-`,
+`
   );
 
   s = s.replace(
     /\brequire\s*\(\s*["']next\/dist\/compiled\/path-to-regexp["']\s*\)/g,
-    `require("path-to-regexp")`,
+    `require("path-to-regexp")`
   );
 
   if (hadCompiledPathToRegexp && !s.includes(PATH_TO_REGEXP_TODO_NEEDLE)) {
@@ -51,11 +51,11 @@ const codemod: Codemod<TSX> = async (root) => {
   const codegenTodo = `${TODO_PREFIX}${R4DIST_SENTINEL}: codegen — verify emitted bundle uses React.lazy (not next/dynamic)\n`;
   s = s.replace(
     /import dynamic from "next\/dynamic"/g,
-    `${codegenTodo}import { lazy as dynamic } from "react"`,
+    `${codegenTodo}import { lazy as dynamic } from "react"`
   );
   s = s.replace(
     /import dynamic from 'next\/dynamic'/g,
-    `${codegenTodo}import { lazy as dynamic } from 'react'`,
+    `${codegenTodo}import { lazy as dynamic } from 'react'`
   );
 
   const headersTypeTodo = `${TODO_PREFIX}${R4DIST_SENTINEL}: \`import("next/headers")\` in types → \`getHeaders\` / \`getCookies\` from @tanstack/start/server — verify \`ReturnType\`\n`;
@@ -63,24 +63,21 @@ const codemod: Codemod<TSX> = async (root) => {
   const beforeHdrType = s;
   s = s.replace(
     /\bimport\s*\(\s*["']next\/headers["']\s*\)\s*\.\s*headers\b/g,
-    `import("@tanstack/start/server").getHeaders`,
+    `import("@tanstack/start/server").getHeaders`
   );
   s = s.replace(
     /\bimport\s*\(\s*["']next\/headers["']\s*\)\s*\.\s*cookies\b/g,
-    `import("@tanstack/start/server").getCookies`,
+    `import("@tanstack/start/server").getCookies`
   );
   if (hadNextHeadersImportType && s !== beforeHdrType) {
     s = headersTypeTodo + s;
   }
 
   const readonlyNavTodo = `${TODO_PREFIX}${R4DIST_SENTINEL}: \`ReadonlyURLSearchParams\` from next/navigation → local alias; narrow to route search types when possible\n`;
-  if (
-    /\bReadonlyURLSearchParams\b/.test(s) &&
-    /from\s*["']next\/navigation["']/.test(s)
-  ) {
+  if (/\bReadonlyURLSearchParams\b/.test(s) && /from\s*["']next\/navigation["']/.test(s)) {
     s = s.replace(
       /^[ \t]*import\s+type\s*\{\s*ReadonlyURLSearchParams\s*\}\s*from\s*["']next\/navigation["']\s*;?\s*\r?\n/m,
-      `${readonlyNavTodo}type ReadonlyURLSearchParams = URLSearchParams;\n`,
+      `${readonlyNavTodo}type ReadonlyURLSearchParams = URLSearchParams;\n`
     );
   }
 
@@ -88,16 +85,16 @@ const codemod: Codemod<TSX> = async (root) => {
   const hadImageImport = /from\s*["']next\/image["']/.test(s);
   s = s.replace(
     /^[ \t]*import\s*\{\s*getImageProps\s*\}\s*from\s*["']next\/image["']\s*;?\s*\r?\n/m,
-    `${imageTodo}function getImageProps<T extends Record<string, unknown>>(input: T): { props: T } {\n  return { props: input };\n}\n`,
+    `${imageTodo}function getImageProps<T extends Record<string, unknown>>(input: T): { props: T } {\n  return { props: input };\n}\n`
   );
   s = s.replace(
     /^[ \t]*import\s+type\s*\{\s*ImageProps\s*\}\s*from\s*["']next\/image["']\s*;?\s*\r?\n/m,
-    `${imageTodo}type ImageProps = React.ImgHTMLAttributes<HTMLImageElement>;\n`,
+    `${imageTodo}type ImageProps = React.ImgHTMLAttributes<HTMLImageElement>;\n`
   );
   if (hadImageImport) {
     s = s.replace(
       /^[ \t]*import\s+type\s*\{\s*ImageProps\s*\}\s*,\s*\{\s*getImageProps\s*\}\s*from\s*["']next\/image["']\s*;?\s*\r?\n/m,
-      `${imageTodo}type ImageProps = React.ImgHTMLAttributes<HTMLImageElement>;\nfunction getImageProps<T extends Record<string, unknown>>(input: T): { props: T } {\n  return { props: input };\n}\n`,
+      `${imageTodo}type ImageProps = React.ImgHTMLAttributes<HTMLImageElement>;\nfunction getImageProps<T extends Record<string, unknown>>(input: T): { props: T } {\n  return { props: input };\n}\n`
     );
   }
 
@@ -105,17 +102,18 @@ const codemod: Codemod<TSX> = async (root) => {
   const hadNextError = /from\s*["']next\/error["']/.test(s);
   s = s.replace(
     /^[ \t]*import\s+([A-Za-z_$][A-Za-z0-9_$]*)\s+from\s*["']next\/error["']\s*;?\s*\r?\n/m,
-    `${nextErrorTodo}const $1 = ({ statusCode = 500 }: { statusCode?: number }) => (\n  <div role="alert">Unexpected error</div>\n);\n`,
+    `${nextErrorTodo}const $1 = ({ statusCode = 500 }: { statusCode?: number }) => (\n  <div role="alert">Unexpected error</div>\n);\n`
   );
   if (hadNextError) {
-    s = s.replace(/\b<([A-Za-z_$][A-Za-z0-9_$]*)\s+statusCode=\{0\}\s*\/>/g, "<div role=\"alert\">Unexpected error</div>");
+    s = s.replace(
+      /\b<([A-Za-z_$][A-Za-z0-9_$]*)\s+statusCode=\{0\}\s*\/>/g,
+      '<div role="alert">Unexpected error</div>'
+    );
   }
 
   if (s === source) return null;
   const r = rootNode.range();
-  return rootNode.commitEdits([
-    { startPos: r.start.index, endPos: r.end.index, insertedText: s },
-  ]);
+  return rootNode.commitEdits([{ startPos: r.start.index, endPos: r.end.index, insertedText: s }]);
 };
 
 export default codemod;

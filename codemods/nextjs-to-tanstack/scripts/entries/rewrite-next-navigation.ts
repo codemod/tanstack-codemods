@@ -62,17 +62,18 @@ const codemod: Codemod<TSX> = async (root) => {
   const fileRouteQueryEdits: Edit[] = [];
   if (analyze.fileRouteQueryBindings.size > 0) {
     fileRouteQueryEdits.push(
-      ...insertRouteUseParamsHooks(rootNode, source, analyze.fileRouteQueryBindings),
+      ...insertRouteUseParamsHooks(rootNode, source, analyze.fileRouteQueryBindings)
     );
     fileRouteQueryEdits.push(
-      ...replaceRouterQueryWithParams(rootNode, analyze.fileRouteQueryBindings),
+      ...replaceRouterQueryWithParams(rootNode, analyze.fileRouteQueryBindings)
     );
   }
 
   const redirectKinds = new Map<string, "plain" | "permanent">();
   const redirectTypeLocals = new Set<string>();
   const typeOnlyUseRouterLocals = new Set<string>();
-  let notFoundImports = new Set<string>();  let needsUseLocation = false;
+  const notFoundImports = new Set<string>();
+  let needsUseLocation = false;
   let needsUseSearch = false;
 
   const importStmts = rootNode.findAll({
@@ -97,14 +98,9 @@ const codemod: Codemod<TSX> = async (root) => {
     const compatMod = /from\s*["']next\/compat\/router["']/.exec(text);
     if (!navMod && !routerMod && !compatMod) continue;
 
-    const fromModule =
-      routerMod !== null || compatMod !== null ? NEXT_PAGES_ROUTER : NEXT_NAV;
+    const fromModule = routerMod !== null || compatMod !== null ? NEXT_PAGES_ROUTER : NEXT_NAV;
     const importSourceLiteral =
-      navMod !== null
-        ? NEXT_NAV
-        : compatMod !== null
-          ? NEXT_COMPAT_ROUTER
-          : NEXT_PAGES_ROUTER;
+      navMod !== null ? NEXT_NAV : compatMod !== null ? NEXT_COMPAT_ROUTER : NEXT_PAGES_ROUTER;
 
     const specText = extractNamedSpecifiersBrace(text);
     if (specText === null) continue;
@@ -115,8 +111,7 @@ const codemod: Codemod<TSX> = async (root) => {
     const keepNext: string[] = [];
     const tanstackFromStmt: string[] = [];
 
-    const needsTanStackRouterHook =
-      !skipUseRouterCallMigrate && analyze.dualHookBindings.size > 0;
+    const needsTanStackRouterHook = !skipUseRouterCallMigrate && analyze.dualHookBindings.size > 0;
 
     for (const raw of specs) {
       const s = raw.trim();
@@ -178,10 +173,7 @@ const codemod: Codemod<TSX> = async (root) => {
         continue;
       }
 
-      if (
-        fromModule === NEXT_NAV &&
-        rp?.exported === READONLY_URL_SEARCH_PARAMS
-      ) {
+      if (fromModule === NEXT_NAV && rp?.exported === READONLY_URL_SEARCH_PARAMS) {
         needsReadonlyUrlSearchParamsAlias = true;
         continue;
       }
@@ -193,22 +185,17 @@ const codemod: Codemod<TSX> = async (root) => {
 
     const replacementLines: string[] = [];
     if (keepNext.length > 0) {
-      replacementLines.push(
-        `import { ${keepNext.join(", ")} } from "${importSourceLiteral}";`,
-      );
+      replacementLines.push(`import { ${keepNext.join(", ")} } from "${importSourceLiteral}";`);
     }
     if (mergedTanstack.length > 0) {
       replacementLines.push(`import { ${mergedTanstack.join(", ")} } from "${TANSTACK}";`);
     }
 
-    const insertedBase =
-      replacementLines.length > 0 ? `${replacementLines.join("\n")}\n` : "";
+    const insertedBase = replacementLines.length > 0 ? `${replacementLines.join("\n")}\n` : "";
 
     let inserted = insertedBase;
     const onlyReadonlyNavigationImport =
-      navMod !== null &&
-      inserted === "" &&
-      specsAreOnlyReadonlyUrlSearchParams(specText);
+      navMod !== null && inserted === "" && specsAreOnlyReadonlyUrlSearchParams(specText);
     const onlyTypeUseRouterImport =
       navMod !== null &&
       /^\s*import\s+type\b/.test(text) &&
@@ -280,9 +267,7 @@ const codemod: Codemod<TSX> = async (root) => {
       const arg = firstCallArg(call.field("arguments"));
       if (!arg) continue;
       edits.push(
-        call.replace(
-          buildImperativeNavigationCall("useNavigate()", arg, prop === "replace"),
-        ),
+        call.replace(buildImperativeNavigationCall("useNavigate()", arg, prop === "replace"))
       );
       routerNavEdits++;
     }
@@ -302,11 +287,12 @@ const codemod: Codemod<TSX> = async (root) => {
         const p = mem.field("property")?.text();
         const parent = mem.parent();
         if (
-          ROUTER_DUAL_HOOK_MEMBERS.has(p ?? "") &&
+          p !== undefined &&
+          ROUTER_DUAL_HOOK_MEMBERS.has(p) &&
           parent?.kind() === "call_expression" &&
           parent.field("function")?.id() === mem.id()
         ) {
-          edits.push(parent.replace(historyLikeRouterCallRewrite(p!, name)));
+          edits.push(parent.replace(historyLikeRouterCallRewrite(p, name)));
           routerNavEdits++;
           continue;
         }
@@ -315,9 +301,7 @@ const codemod: Codemod<TSX> = async (root) => {
         if (parent.field("function")?.id() !== mem.id()) continue;
         const arg = firstCallArg(parent.field("arguments"));
         if (!arg) continue;
-        edits.push(
-          parent.replace(buildImperativeNavigationCall(calleeName, arg, p === "replace")),
-        );
+        edits.push(parent.replace(buildImperativeNavigationCall(calleeName, arg, p === "replace")));
         routerNavEdits++;
       }
     }
@@ -374,7 +358,7 @@ const codemod: Codemod<TSX> = async (root) => {
       const r = call.range();
       if (
         dualLexicalRanges.some((lex) =>
-          overlapsRange({ start: r.start.index, end: r.end.index }, lex),
+          overlapsRange({ start: r.start.index, end: r.end.index }, lex)
         )
       ) {
         continue;
@@ -404,8 +388,7 @@ const codemod: Codemod<TSX> = async (root) => {
     }
   }
 
-  const needsR4gBanner =
-    redirectEdits > 0 || routerNavEdits > 0 || notFoundEdits > 0;
+  const needsR4gBanner = redirectEdits > 0 || routerNavEdits > 0 || notFoundEdits > 0;
   const takeBanner = needsR4gBanner ? todoBannerTake(source) : (): string => "";
 
   for (const { stmt, text } of importPlan) {
@@ -427,10 +410,7 @@ const codemod: Codemod<TSX> = async (root) => {
     });
   }
 
-  if (
-    needsReadonlyUrlSearchParamsAlias &&
-    !/\btype\s+ReadonlyURLSearchParams\b/.test(source)
-  ) {
+  if (needsReadonlyUrlSearchParamsAlias && !/\btype\s+ReadonlyURLSearchParams\b/.test(source)) {
     const aliasEdit = insertAfterImportsBlock(rootNode, source, READONLY_SEARCH_ALIAS);
     if (aliasEdit) edits.push(aliasEdit);
   }
@@ -450,7 +430,8 @@ const codemod: Codemod<TSX> = async (root) => {
       })) {
         const par = node.parent();
         if (par?.kind() === "type_arguments" && par.parent()?.kind() === "generic_type") {
-          const gt = par.parent()!;
+          const gt = par.parent();
+          if (gt === null || gt === undefined) continue;
           if (gt.field("name")?.text() === "ReturnType") {
             edits.push(gt.replace("NextNavigationRouterLike"));
           }
@@ -506,14 +487,15 @@ const ROUTER_TYPE_ALIAS = `${TODO_PREFIX}next/navigation type-only useRouter (R4
 function insertAfterImportsBlock(
   rootNode: SgNode<TSX>,
   source: string,
-  inserted: string,
+  inserted: string
 ): Edit | null {
   if (source.includes("ReadonlyURLSearchParams = URLSearchParams")) return null;
   const imports = rootNode.findAll({ rule: { kind: "import_statement" } });
   if (imports.length === 0) {
     return { startPos: 0, endPos: 0, insertedText: `${inserted}\n` };
   }
-  const last = imports[imports.length - 1]!;
+  const last = imports.at(-1);
+  if (last === undefined) return null;
   const pos = last.range().end.index;
   return { startPos: pos, endPos: pos, insertedText: `\n${inserted}` };
 }
@@ -521,10 +503,7 @@ function insertAfterImportsBlock(
 function specsAreOnlyReadonlyUrlSearchParams(specText: string): boolean {
   const specs = splitImportSpecifiers(specText);
   if (specs.length === 0) return false;
-  return specs.every(
-    (raw) =>
-      parseImportSpecifier(raw)?.exported === READONLY_URL_SEARCH_PARAMS,
-  );
+  return specs.every((raw) => parseImportSpecifier(raw)?.exported === READONLY_URL_SEARCH_PARAMS);
 }
 
 function specsAreOnlyTypeUseRouter(specText: string): boolean {
@@ -533,15 +512,13 @@ function specsAreOnlyTypeUseRouter(specText: string): boolean {
   return specs.every((raw) => parseImportSpecifier(raw)?.exported === "useRouter");
 }
 
-function parseImportSpecifier(
-  raw: string,
-): { exported: string; local: string } | null {
+function parseImportSpecifier(raw: string): { exported: string; local: string } | null {
   const t = raw.trim().replace(/^type\s+/, "");
   const am = /^([A-Za-z0-9_]+)\s+as\s+([A-Za-z0-9_]+)$/.exec(t);
-  if (am) return { exported: am[1]!, local: am[2]! };
+  if (am) return { exported: am[1] ?? "", local: am[2] ?? "" };
   const id = /^([A-Za-z0-9_]+)$/.exec(t);
   if (!id) return null;
-  return { exported: id[1]!, local: id[1]! };
+  return { exported: id[1] ?? "", local: id[1] ?? "" };
 }
 
 function todoBannerTake(source: string): () => string {
@@ -575,7 +552,8 @@ function collectUseRouterBindingNames(root: SgNode<TSX>): Set<string> {
 function inferCreateFileRouteParamNames(source: string): string[] {
   const out: string[] = [];
   for (const m of source.matchAll(/createFileRoute\s*\(\s*["']([^"']+)["']\s*\)/g)) {
-    const path = m[1]!;
+    const path = m[1];
+    if (path === undefined) continue;
     for (const seg of path.split("/")) {
       if (seg.startsWith("$") && seg.length > 1) out.push(seg.slice(1));
     }
@@ -585,13 +563,12 @@ function inferCreateFileRouteParamNames(source: string): string[] {
 
 function collectRouterQueryKeysFromSource(source: string, routerName: string): Set<string> {
   const out = new Set<string>();
-  const re = new RegExp(
-    `\\b${escapeRx(routerName)}\\.query\\.([a-zA-Z_$][a-zA-Z0-9_$]*)`,
-    "g",
-  );
-  let mm: RegExpExecArray | null;
-  while ((mm = re.exec(source)) !== null) {
-    out.add(mm[1]!);
+  const re = new RegExp(`\\b${escapeRx(routerName)}\\.query\\.([a-zA-Z_$][a-zA-Z0-9_$]*)`, "g");
+  let mm: RegExpExecArray | null = re.exec(source);
+  while (mm !== null) {
+    const cap = mm[1];
+    if (cap !== undefined) out.add(cap);
+    mm = re.exec(source);
   }
   return out;
 }
@@ -599,7 +576,7 @@ function collectRouterQueryKeysFromSource(source: string, routerName: string): S
 function canMigrateFileRouteQuery(
   source: string,
   bindingName: string,
-  members: Set<string>,
+  members: Set<string>
 ): boolean {
   if (!members.has("query")) return false;
   const params = inferCreateFileRouteParamNames(source);
@@ -630,11 +607,7 @@ function lineIndentAtSourceIndex(source: string, index: number): string {
   return m?.[1] ?? "";
 }
 
-function insertRouteUseParamsHooks(
-  root: SgNode<TSX>,
-  source: string,
-  names: Set<string>,
-): Edit[] {
+function insertRouteUseParamsHooks(root: SgNode<TSX>, source: string, names: Set<string>): Edit[] {
   const edits: Edit[] = [];
   const seenBlock = new Set<number>();
   for (const decl of root.findAll({ rule: { kind: "variable_declarator" } })) {
@@ -684,7 +657,10 @@ function replaceRouterQueryWithParams(root: SgNode<TSX>, names: Set<string>): Ed
   return edits;
 }
 
-function analyzeUseRouterBindings(root: SgNode<TSX>, source: string): {
+function analyzeUseRouterBindings(
+  root: SgNode<TSX>,
+  source: string
+): {
   hardSkipped: boolean;
   dualHookBindings: Set<string>;
   fileRouteQueryBindings: Set<string>;
@@ -753,10 +729,7 @@ function hasInlineNextRouterRisk(root: SgNode<TSX>): boolean {
   return false;
 }
 
-function collectDualHookDeclarators(
-  root: SgNode<TSX>,
-  dualNames: Set<string>,
-): SgNode<TSX>[] {
+function collectDualHookDeclarators(root: SgNode<TSX>, dualNames: Set<string>): SgNode<TSX>[] {
   const out: SgNode<TSX>[] = [];
   for (const decl of root.findAll({ rule: { kind: "variable_declarator" } })) {
     const id = decl.field("name");
@@ -802,7 +775,7 @@ type IndexSpan = { start: number; end: number };
 function dualHookLexicalRanges(
   source: string,
   root: SgNode<TSX>,
-  dualNames: Set<string>,
+  dualNames: Set<string>
 ): IndexSpan[] {
   const spans: IndexSpan[] = [];
   const seenLex = new Set<number>();
@@ -831,9 +804,7 @@ function lineStartIndex(source: string, index: number): number {
   return s;
 }
 
-
 function historyLikeRouterCallRewrite(prop: string, routerBinding: string): string {
-
   if (prop === "refresh") return `${routerBinding}.invalidate()`;
   if (prop === "back") return `${routerBinding}.history.back()`;
   if (prop === "forward") return `${routerBinding}.history.forward()`;
@@ -904,10 +875,7 @@ function redirectToPayload(arg: SgNode<TSX>): ToOrHref | null {
   const k = arg.kind();
   if (k === "string_literal" || k === "string" || k === "template_string") {
     const t = arg.text();
-    if (
-      (t.startsWith('"') || t.startsWith("'")) &&
-      /^["']https?:\/\//i.test(t)
-    ) {
+    if ((t.startsWith('"') || t.startsWith("'")) && /^["']https?:\/\//i.test(t)) {
       return { key: "href", expr: arg.text() };
     }
     if (k === "template_string") {
@@ -924,7 +892,7 @@ function redirectToPayload(arg: SgNode<TSX>): ToOrHref | null {
 function buildRedirectThrowEdit(
   call: SgNode<TSX>,
   newRedirectCall: string,
-  source: string,
+  source: string
 ): Edit | null {
   const p = call.parent();
   if (p?.kind() === "throw_statement") {
@@ -948,9 +916,7 @@ function buildRedirectThrowEdit(
 
   if (p?.kind() === "expression_statement") {
     const stmt = p.range();
-    const semi = source.slice(stmt.start.index, stmt.end.index).trimEnd().endsWith(";")
-      ? ";"
-      : "";
+    const semi = source.slice(stmt.start.index, stmt.end.index).trimEnd().endsWith(";") ? ";" : "";
     return {
       startPos: stmt.start.index,
       endPos: stmt.end.index,
@@ -1004,7 +970,7 @@ function mergeTanstackImports(specs: string[]): string[] {
 /** Merge back-to-back `import { … } from "@tanstack/react-router"` plans into one line. */
 function coalesceAdjacentTanstackImports(
   plan: { stmt: SgNode<TSX>; text: string }[],
-  source: string,
+  source: string
 ): void {
   if (plan.length < 2) return;
   const ordered = plan
@@ -1012,15 +978,18 @@ function coalesceAdjacentTanstackImports(
     .sort((a, b) => a.stmt.range().start.index - b.stmt.range().start.index);
   const drop = new Set<number>();
   for (let j = 0; j < ordered.length - 1; j++) {
-    const a = ordered[j]!;
-    const b = ordered[j + 1]!;
+    const a = ordered[j];
+    const b = ordered[j + 1];
+    if (a === undefined || b === undefined) continue;
     if (drop.has(a.idx)) continue;
     const specsA = parseNamedImportSpecsFromTanstackLine(a.text);
     const specsB = parseNamedImportSpecsFromTanstackLine(b.text);
     if (!specsA || !specsB) continue;
     const gap = source.slice(a.stmt.range().end.index, b.stmt.range().start.index);
     if (!/^\s*$/.test(gap)) continue;
-    plan[a.idx]!.text = `import { ${mergeTanstackImports([...specsA, ...specsB]).join(", ")} } from "${TANSTACK}";\n`;
+    const planEntry = plan[a.idx];
+    if (planEntry === undefined) continue;
+    planEntry.text = `import { ${mergeTanstackImports([...specsA, ...specsB]).join(", ")} } from "${TANSTACK}";\n`;
     drop.add(b.idx);
   }
   for (let i = plan.length - 1; i >= 0; i--) {
@@ -1032,15 +1001,16 @@ function coalesceAdjacentTanstackImports(
 function coalesceFollowingUnchangedTanstackImport(
   rootNode: SgNode<TSX>,
   plan: { stmt: SgNode<TSX>; text: string }[],
-  source: string,
+  source: string
 ): void {
   const inPlan = new Set(plan.map((p) => p.stmt.id()));
   const imports = rootNode
     .findAll({ rule: { kind: "import_statement" } })
     .sort((a, b) => a.range().start.index - b.range().start.index);
   for (let i = 0; i < imports.length - 1; i++) {
-    const aStmt = imports[i]!;
-    const bStmt = imports[i + 1]!;
+    const aStmt = imports[i];
+    const bStmt = imports[i + 1];
+    if (aStmt === undefined || bStmt === undefined) continue;
     const aEntry = plan.find((p) => p.stmt.id() === aStmt.id());
     if (!aEntry) continue;
     if (inPlan.has(bStmt.id())) continue;
@@ -1056,9 +1026,10 @@ function coalesceFollowingUnchangedTanstackImport(
 }
 
 function parseNamedImportSpecsFromTanstackLine(text: string): string[] | null {
-  const m = /^\s*import\s+\{\s*([^}]+)\s*\}\s*from\s*["']@tanstack\/react-router["']\s*;?\s*$/m.exec(
-    text.trim(),
-  );
+  const m =
+    /^\s*import\s+\{\s*([^}]+)\s*\}\s*from\s*["']@tanstack\/react-router["']\s*;?\s*$/m.exec(
+      text.trim()
+    );
   if (!m?.[1]) return null;
   return splitImportSpecifiers(m[1]);
 }
@@ -1068,11 +1039,7 @@ function parseNamedImportSpecsFromTanstackLine(text: string): string[] | null {
  * Uses structured `to` + `params` + `search` + `hash` when the URL can be split safely;
  * see https://tanstack.com/router/latest/docs/framework/react/guide/navigation
  */
-function buildImperativeNavigationCall(
-  callee: string,
-  arg: SgNode<TSX>,
-  replace: boolean,
-): string {
+function buildImperativeNavigationCall(callee: string, arg: SgNode<TSX>, replace: boolean): string {
   const body = tryStructuredNavigateArg(arg) ?? `to: ${arg.text()}`;
   const suffix = replace ? ", replace: true" : "";
   return `${callee}({ ${body}${suffix} })`;
@@ -1092,10 +1059,7 @@ function tryStructuredNavigateArg(arg: SgNode<TSX>): string | null {
 }
 
 function stringLiteralInner(raw: string): string {
-  if (
-    (raw.startsWith('"') && raw.endsWith('"')) ||
-    (raw.startsWith("'") && raw.endsWith("'"))
-  ) {
+  if ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'"))) {
     return raw.slice(1, -1);
   }
   return raw;
@@ -1125,9 +1089,7 @@ function tryStructuredStaticPathQueryHash(inner: string): string | null {
   return parts.join(", ");
 }
 
-type TemplatePiece =
-  | { kind: "str"; text: string }
-  | { kind: "sub"; expr: SgNode<TSX> };
+type TemplatePiece = { kind: "str"; text: string } | { kind: "sub"; expr: SgNode<TSX> };
 
 function collectTemplatePieces(node: SgNode<TSX>): TemplatePiece[] | null {
   if (node.kind() !== "template_string") return null;
@@ -1173,9 +1135,7 @@ function tryStructuredTemplateUrl(node: SgNode<TSX>): string | null {
   const pieces = collectTemplatePieces(node);
   if (pieces === null) return null;
 
-  type PathTok =
-    | { t: "s"; v: string }
-    | { t: "p"; param: string; exprText: string };
+  type PathTok = { t: "s"; v: string } | { t: "p"; param: string; exprText: string };
 
   const pathToks: PathTok[] = [];
   let queryBuf = "";
@@ -1235,7 +1195,7 @@ function tryStructuredTemplateUrl(node: SgNode<TSX>): string | null {
   const out: string[] = [`to: ${JSON.stringify(toPat)}`];
   if (paramsOrder.length > 0) {
     const entries = paramsOrder.map((k) => {
-      const ex = paramToExpr.get(k)!;
+      const ex = paramToExpr.get(k) ?? k;
       return k === ex ? k : `${k}: ${ex}`;
     });
     out.push(`params: { ${entries.join(", ")} }`);
@@ -1280,10 +1240,7 @@ function parseQueryToSearchObjectLiteral(query: string): string | null {
   return `{ ${props.join(", ")} }`;
 }
 
-function isRedirectReplaceArg(
-  arg: SgNode<TSX> | null,
-  redirectTypeLocals: Set<string>,
-): boolean {
+function isRedirectReplaceArg(arg: SgNode<TSX> | null, redirectTypeLocals: Set<string>): boolean {
   if (!arg || redirectTypeLocals.size === 0) return false;
   if (arg.kind() !== "member_expression") return false;
   const obj = arg.field("object");
@@ -1295,7 +1252,7 @@ function isRedirectReplaceArg(
 /** `useRouter` call site: omit bare replace when it initializes a TanStack `useRouter()` (dual-hook layout). */
 function shouldReplaceBareUseRouterCall(
   call: SgNode<TSX>,
-  analyze: { dualHookBindings: Set<string> },
+  analyze: { dualHookBindings: Set<string> }
 ): boolean {
   const p = call.parent();
   if (p?.kind() === "variable_declarator") {

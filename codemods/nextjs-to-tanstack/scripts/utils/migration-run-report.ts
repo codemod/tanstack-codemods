@@ -120,7 +120,7 @@ function formatMetricEntries(atom: MetricAtom): string {
 }
 
 function collectStepReportSnapshots(
-  stateKeyRoot: string,
+  stateKeyRoot: string
 ): Array<{ stepId: string; label: string; raw: string | null }> {
   const pkg = normalizePath(stateKeyRoot);
   const items: Array<{ stepId: string; label: string }> = [
@@ -180,7 +180,7 @@ export function buildMigrationRunSummarySection(params: {
   lines.push("## 4. Migration run summary");
   lines.push("");
   lines.push(
-    "From `codemod:workflow` **state**: R10 / R10b totals, per-step JSON (`acquireLock` / `setState` / `getState`), and CLI **metrics** (`useMetricAtom` in R10 / R10b).",
+    "From `codemod:workflow` **state**: R10 / R10b totals, per-step JSON (`acquireLock` / `setState` / `getState`), and CLI **metrics** (`useMetricAtom` in R10 / R10b)."
   );
   lines.push("");
   lines.push(`- **Package root (this manifest):** \`${packageRoot}\``);
@@ -206,12 +206,14 @@ export function buildMigrationRunSummarySection(params: {
   }
   if (!anyStep) {
     lines.push(
-      "*No step reports in workflow state for this package (normal when only this script runs, or earlier steps did not persist a report).*",
+      "*No step reports in workflow state for this package (normal when only this script runs, or earlier steps did not persist a report).*"
     );
     lines.push("");
   }
 
-  lines.push("### R10 — async route components (loader migration + `// TODO: … Route.loader …` when needed)");
+  lines.push(
+    "### R10 — async route components (loader migration + `// TODO: … Route.loader …` when needed)"
+  );
   lines.push("");
   if (r10 && r10.todoMarkersAdded > 0) {
     lines.push(`- **TODO markers inserted:** ${r10.todoMarkersAdded}`);
@@ -234,15 +236,10 @@ export function buildMigrationRunSummarySection(params: {
 
   lines.push("### R10b — remaining `next/*` imports (per-line TODOs + middleware)");
   lines.push("");
-  if (
-    r10b &&
-    (Object.keys(r10b.byModule).length > 0 || r10b.middlewareTodoFiles.length > 0)
-  ) {
+  if (r10b && (Object.keys(r10b.byModule).length > 0 || r10b.middlewareTodoFiles.length > 0)) {
     if (Object.keys(r10b.byModule).length > 0) {
       lines.push("- **Counts by module:**");
-      for (const [mod, c] of Object.entries(r10b.byModule).sort(([a], [b]) =>
-        a.localeCompare(b),
-      )) {
+      for (const [mod, c] of Object.entries(r10b.byModule).sort(([a], [b]) => a.localeCompare(b))) {
         lines.push(`  - \`${mod}\`: ${c}`);
       }
     }

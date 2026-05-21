@@ -90,7 +90,10 @@ function patchTsconfig(path: string): void {
     return;
   }
   const before = JSON.stringify(cfg);
-  const coerce = cfg.compilerOptions ?? (cfg.compilerOptions = {});
+  if (cfg.compilerOptions === undefined) {
+    cfg.compilerOptions = {};
+  }
+  const coerce = cfg.compilerOptions;
 
   if (Array.isArray(coerce.plugins)) {
     coerce.plugins = coerce.plugins.filter((p) => {
@@ -153,8 +156,7 @@ function patchEslintrcJson(path: string): void {
     }
   } else if (Array.isArray(cfg.extends)) {
     const next = cfg.extends.filter((e) => !drop.has(String(e)));
-    cfg.extends =
-      next.length > 0 ? next : (["eslint:recommended"] as string[]);
+    cfg.extends = next.length > 0 ? next : (["eslint:recommended"] as string[]);
   }
 
   if (JSON.stringify(cfg) === before) return;

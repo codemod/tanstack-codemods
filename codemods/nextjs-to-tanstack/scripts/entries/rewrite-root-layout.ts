@@ -21,12 +21,14 @@
 
 import type { Codemod, Edit, SgNode } from "codemod:ast-grep";
 import type TSX from "codemod:ast-grep/langs/tsx";
-import {
-  addDefaultImport,
-  addImport,
-} from "../utils/imports.ts";
+import { addDefaultImport, addImport } from "../utils/imports.ts";
 import { ensureParentDir, pruneEmptyAncestorsAfterRename } from "../utils/ensure-parent-dir.ts";
-import { getAppRelativePath, getFilename, inferCodemodTargetDir, resolveRenameTarget } from "../utils/paths.ts";
+import {
+  getAppRelativePath,
+  getFilename,
+  inferCodemodTargetDir,
+  resolveRenameTarget,
+} from "../utils/paths.ts";
 import { insertTodoBefore } from "../utils/sentinels.ts";
 import { resolveGlobalsCssUrlImport } from "../utils/globals-css-path.ts";
 import {
@@ -40,10 +42,8 @@ const ROOT_ROUTE_DOC =
 
 const codemod: Codemod<TSX> = async (root) => {
   const relative = getAppRelativePath(root);
-  const isLayout =
-    /\/layout\.(t|j)sx$|^layout\.(t|j)sx$/.test(relative);
-  const isPagesApp =
-    /\/_app\.(t|j)sx$|^_app\.(t|j)sx$/.test(relative);
+  const isLayout = /\/layout\.(t|j)sx$|^layout\.(t|j)sx$/.test(relative);
+  const isPagesApp = /\/_app\.(t|j)sx$|^_app\.(t|j)sx$/.test(relative);
   if (!isLayout && !isPagesApp) {
     return null;
   }
@@ -80,11 +80,7 @@ const codemod: Codemod<TSX> = async (root) => {
     ? pagesShellToAppRootPath(relative)
     : relative.replace(/layout\.(t|j)sx$/, "__root.$1sx");
   const target = resolveRenameTarget(root, newRelative);
-  const globalsUrl = resolveGlobalsCssUrlImport(
-    target,
-    rootNode.text(),
-    getFilename(root),
-  );
+  const globalsUrl = resolveGlobalsCssUrlImport(target, rootNode.text(), getFilename(root));
 
   if (isPagesApp) {
     return transformPagesAppRoot(
@@ -95,7 +91,7 @@ const codemod: Codemod<TSX> = async (root) => {
       fnName,
       relative,
       globalsUrl,
-      defaultValue.kind() === "call_expression",
+      defaultValue.kind() === "call_expression"
     );
   }
 
@@ -118,12 +114,13 @@ const codemod: Codemod<TSX> = async (root) => {
   const hasAnyImport = rootNode.find({ rule: { kind: "import_statement" } }) !== null;
 
   const isHocDefault = defaultValue.kind() === "call_expression";
-  const replacement = buildReplacement(fnName, newJsx, hasAnyImport ? "" : buildPreludeImports(globalsUrl));
+  const replacement = buildReplacement(
+    fnName,
+    newJsx,
+    hasAnyImport ? "" : buildPreludeImports(globalsUrl)
+  );
   if (isHocDefault) {
-    const start = Math.min(
-      fn.range().start.index,
-      defaultExport.range().start.index,
-    );
+    const start = Math.min(fn.range().start.index, defaultExport.range().start.index);
     const end = Math.max(fn.range().end.index, defaultExport.range().end.index);
     edits.push({
       startPos: start,
@@ -175,10 +172,7 @@ function getDefaultExportValue(exportStmt: SgNode<TSX>): SgNode<TSX> | null {
   return null;
 }
 
-function resolveRootLayoutFunction(
-  rootNode: SgNode<TSX>,
-  value: SgNode<TSX>,
-): SgNode<TSX> | null {
+function resolveRootLayoutFunction(rootNode: SgNode<TSX>, value: SgNode<TSX>): SgNode<TSX> | null {
   if (value.kind() === "function_declaration") {
     return value;
   }
@@ -189,10 +183,7 @@ function resolveRootLayoutFunction(
   return null;
 }
 
-function unwrapHocCallToFunction(
-  rootNode: SgNode<TSX>,
-  callExpr: SgNode<TSX>,
-): SgNode<TSX> | null {
+function unwrapHocCallToFunction(rootNode: SgNode<TSX>, callExpr: SgNode<TSX>): SgNode<TSX> | null {
   const arg = firstCallArgument(callExpr);
   if (!arg) return null;
   if (arg.kind() === "identifier") {
@@ -212,10 +203,7 @@ function firstCallArgument(callExpr: SgNode<TSX>): SgNode<TSX> | null {
   return null;
 }
 
-function findFunctionDeclarationByName(
-  rootNode: SgNode<TSX>,
-  name: string,
-): SgNode<TSX> | null {
+function findFunctionDeclarationByName(rootNode: SgNode<TSX>, name: string): SgNode<TSX> | null {
   for (const stmt of rootNode.children()) {
     if (stmt.kind() !== "function_declaration") continue;
     if (stmt.field("name")?.text() === name) return stmt;
@@ -224,10 +212,7 @@ function findFunctionDeclarationByName(
 }
 
 function buildPreludeImports(globalsUrl: string): string {
-  return (
-    `import { Outlet, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";\n` +
-    `import appCss from "${globalsUrl}";\n\n`
-  );
+  return `import { Outlet, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";\nimport appCss from "${globalsUrl}";\n\n`;
 }
 
 function findReturnedRootJsx(fn: SgNode<TSX>): SgNode<TSX> | null {
@@ -297,9 +282,10 @@ function rebuildRootJsx(_source: string, htmlEl: SgNode<TSX>): string | null {
 
   const bodyInnerRewritten = replaceChildrenWithOutlet(originalBody);
   const normalisedInner = bodyInnerRewritten.trim();
-  const bodyContents = normalisedInner.length > 0
-    ? `\n        ${normalisedInner}\n        <Scripts />\n      `
-    : `\n        <Outlet />\n        <Scripts />\n      `;
+  const bodyContents =
+    normalisedInner.length > 0
+      ? `\n        ${normalisedInner}\n        <Scripts />\n      `
+      : "\n        <Outlet />\n        <Scripts />\n      ";
   const newBody = `${bodyOpen.text()}${bodyContents}${bodyClose.text()}`;
 
   // Reconstruct children of <html>: keep everything before <body>, insert/merge
@@ -310,7 +296,7 @@ function rebuildRootJsx(_source: string, htmlEl: SgNode<TSX>): string | null {
   const existingHead = findDirectJsxChild(htmlEl, "head");
   const newHeadBlock = existingHead
     ? rebuildHeadWithContent(source, existingHead)
-    : `<head>\n        <HeadContent />\n      </head>`;
+    : "<head>\n        <HeadContent />\n      </head>";
 
   const htmlInner = assembleHtmlInner({
     source,
@@ -337,9 +323,10 @@ function rebuildHeadWithContent(source: string, headEl: SgNode<TSX>): string {
     return headEl.text();
   }
   const trimmed = originalInner.trim();
-  const injected = trimmed.length > 0
-    ? `\n        <HeadContent />\n        ${trimmed}\n      `
-    : `\n        <HeadContent />\n      `;
+  const injected =
+    trimmed.length > 0
+      ? `\n        <HeadContent />\n        ${trimmed}\n      `
+      : "\n        <HeadContent />\n      ";
   return `${openEl.text()}${injected}${closeEl.text()}`;
 }
 
@@ -423,16 +410,8 @@ function replaceChildrenWithOutlet(bodyInner: string): string {
   return bodyInner.replace(/\{\s*children\s*\}/, "<Outlet />");
 }
 
-function buildReplacement(
-  fnName: string,
-  newJsx: string,
-  preludeImports: string,
-): string {
-  return (
-    preludeImports +
-    `export const Route = createRootRoute({\n  component: ${fnName},\n});\n\n` +
-    `function ${fnName}() {\n  return (\n    ${newJsx}\n  );\n}`
-  );
+function buildReplacement(fnName: string, newJsx: string, preludeImports: string): string {
+  return `${preludeImports}export const Route = createRootRoute({\n  component: ${fnName},\n});\n\nfunction ${fnName}() {\n  return (\n    ${newJsx}\n  );\n}`;
 }
 
 function collectImports(rootNode: SgNode<TSX>, globalsUrl: string): Edit[] {
@@ -468,10 +447,7 @@ function rebuildPagesAppJsx(source: string, jsxRoot: SgNode<TSX>): string | null
   const frag = source.slice(r.start.index, r.end.index);
   const next = frag
     .replace(/<Component\s*\{\s*\.\.\.\s*pageProps\s*\}\s*\/>/g, "<Outlet />")
-    .replace(
-      /<Component\s*\{\s*\.\.\.\s*pageProps\s*\}\s*>\s*<\/Component>/g,
-      "<Outlet />",
-    )
+    .replace(/<Component\s*\{\s*\.\.\.\s*pageProps\s*\}\s*>\s*<\/Component>/g, "<Outlet />")
     .replace(/<Component\s*\/>/g, "<Outlet />");
   if (next === frag) {
     return null;
@@ -487,7 +463,7 @@ function transformPagesAppRoot(
   fnName: string,
   relative: string,
   globalsUrl: string,
-  isHocDefault: boolean,
+  isHocDefault: boolean
 ): string {
   const returnedJsx = findReturnedAnyJsx(fn);
   if (!returnedJsx) {
@@ -504,10 +480,7 @@ function transformPagesAppRoot(
   const inner = buildReplacement(fnName, newJsx, prelude);
 
   if (isHocDefault) {
-    const start = Math.min(
-      fn.range().start.index,
-      defaultExport.range().start.index,
-    );
+    const start = Math.min(fn.range().start.index, defaultExport.range().start.index);
     const end = Math.max(fn.range().end.index, defaultExport.range().end.index);
     edits.push({
       startPos: start,
@@ -543,7 +516,7 @@ function transformPagesAppRoot(
 function stripAppWithTranslationImport(source: string): string {
   return source.replace(
     /^\s*import\s+\{\s*appWithTranslation\s*\}\s+from\s+["']next-i18next["']\s*;?\s*\r?\n?/m,
-    "",
+    ""
   );
 }
 
@@ -551,23 +524,14 @@ function stripAppWithTranslationImport(source: string): string {
  * `dir={pageProps._nextI18Next?.initialLocale === …}` → pathname-derived locale
  * (Next.js default locale is omitted from the URL; one other locale is usually prefixed).
  */
-function patchNextI18NextDirAttribute(
-  source: string,
-  cfg: NextI18nCodemodConfig,
-): string {
+function patchNextI18NextDirAttribute(source: string, cfg: NextI18nCodemodConfig): string {
   const nonDefault = cfg.locales.find((l) => l !== cfg.defaultLocale);
   if (!nonDefault) return source;
   return source.replace(
     /dir=\{\s*pageProps\._nextI18Next\?\.\s*initialLocale\s*===\s*["']([^"']+)["']\s*\?\s*["']([^"']+)["']\s*:\s*["']([^"']+)["']\s*\}/g,
     (_, ifLocale, thenDir, elseDir) => {
-      return (
-        `dir={(() => {\n` +
-        `  const p = typeof window === "undefined" ? "" : (window.location.pathname.split("/").filter(Boolean)[0] ?? "");\n` +
-        `  const locale = p === ${JSON.stringify(nonDefault)} ? ${JSON.stringify(nonDefault)} : ${JSON.stringify(cfg.defaultLocale)};\n` +
-        `  return locale === ${JSON.stringify(ifLocale)} ? ${JSON.stringify(thenDir)} : ${JSON.stringify(elseDir)};\n` +
-        `})()}`
-      );
-    },
+      return `dir={(() => {\n  const p = typeof window === "undefined" ? "" : (window.location.pathname.split("/").filter(Boolean)[0] ?? "");\n  const locale = p === ${JSON.stringify(nonDefault)} ? ${JSON.stringify(nonDefault)} : ${JSON.stringify(cfg.defaultLocale)};\n  return locale === ${JSON.stringify(ifLocale)} ? ${JSON.stringify(thenDir)} : ${JSON.stringify(elseDir)};\n})()}`;
+    }
   );
 }
 
@@ -575,7 +539,7 @@ function emitTodo(rootNode: SgNode<TSX>, defaultExport: SgNode<TSX>): string {
   const edit = insertTodoBefore(
     defaultExport,
     "root layout shape not supported; convert manually to createRootRoute",
-    ROOT_ROUTE_DOC,
+    ROOT_ROUTE_DOC
   );
   return rootNode.commitEdits([edit]);
 }

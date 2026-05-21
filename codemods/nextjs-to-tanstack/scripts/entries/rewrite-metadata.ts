@@ -30,10 +30,7 @@ import {
   isTanstackAppRootFile,
   tryMergeCssUrlBindingIntoExistingHead,
 } from "../utils/layout-head-link-hoist.ts";
-import {
-  composeHeadOption,
-  metadataObjectToHeadParts,
-} from "../utils/metadata.ts";
+import { composeHeadOption, metadataObjectToHeadParts } from "../utils/metadata.ts";
 import { viewportObjectToMetaParts } from "../utils/viewport-meta.ts";
 import { getAppRelativePath } from "../utils/paths.ts";
 import { insertReviewBefore } from "../utils/sentinels.ts";
@@ -64,7 +61,7 @@ const codemod: Codemod<TSX> = async (root) => {
       source,
       rootForHoist,
       relative,
-      configObj as unknown as SgNode,
+      configObj as unknown as SgNode
     );
     if (mergeEdit) {
       return rootNode.commitEdits([mergeEdit]);
@@ -100,9 +97,7 @@ const codemod: Codemod<TSX> = async (root) => {
     }
   }
 
-  const mdParts = metadataExport
-    ? metadataObjectToHeadParts(metadataExport.objNode)
-    : null;
+  const mdParts = metadataExport ? metadataObjectToHeadParts(metadataExport.objNode) : null;
 
   if (mdParts) {
     metaItems.push(...mdParts.metaItems);
@@ -136,20 +131,14 @@ const codemod: Codemod<TSX> = async (root) => {
   if (viewportExport) {
     removals.push({
       startPos: viewportExport.lex.range().start.index,
-      endPos: extendToTrailingNewline(
-        source,
-        viewportExport.lex.range().end.index,
-      ),
+      endPos: extendToTrailingNewline(source, viewportExport.lex.range().end.index),
       insertedText: "",
     });
   }
   if (metadataExport) {
     removals.push({
       startPos: metadataExport.lex.range().start.index,
-      endPos: extendToTrailingNewline(
-        source,
-        metadataExport.lex.range().end.index,
-      ),
+      endPos: extendToTrailingNewline(source, metadataExport.lex.range().end.index),
       insertedText: "",
     });
   }
@@ -186,12 +175,13 @@ interface ExportedConstObject {
 
 function findExportedConstObject(
   rootNode: SgNode<TSX>,
-  exportName: string,
+  exportName: string
 ): ExportedConstObject | null {
   for (const child of rootNode.children()) {
     if (child.kind() !== "export_statement") continue;
-    const decl = firstChildOfKind(child, "lexical_declaration")
-      ?? firstChildOfKind(child, "variable_declaration");
+    const decl =
+      firstChildOfKind(child, "lexical_declaration") ??
+      firstChildOfKind(child, "variable_declaration");
     if (!decl) continue;
     const declarator = firstChildOfKind(decl, "variable_declarator");
     if (!declarator) continue;
@@ -204,10 +194,7 @@ function findExportedConstObject(
   return null;
 }
 
-function findNamedFunctionExport(
-  rootNode: SgNode<TSX>,
-  name: string,
-): SgNode<TSX> | null {
+function findNamedFunctionExport(rootNode: SgNode<TSX>, name: string): SgNode<TSX> | null {
   return rootNode.find({
     rule: {
       kind: "function_declaration",

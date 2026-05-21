@@ -10,7 +10,7 @@ import { inferCodemodTargetDir, normalizePath } from "./paths.ts";
 export function resolveGlobalsCssUrlImport(
   __rootTsxAbs: string,
   layoutFileSource?: string,
-  layoutFileAbs?: string,
+  layoutFileAbs?: string
 ): string {
   const appDir = dirname(normalizePath(__rootTsxAbs));
   if (layoutFileSource !== undefined && layoutFileAbs !== undefined) {
@@ -27,7 +27,7 @@ export function resolveGlobalsCssUrlImport(
 function inferGlobalsFromImports(
   source: string,
   layoutFileAbs: string,
-  appDirOfRoot: string,
+  appDirOfRoot: string
 ): string | null {
   const layoutDir = dirname(normalizePath(layoutFileAbs));
   const pkgRoot = inferCodemodTargetDir(layoutFileAbs);
@@ -39,21 +39,23 @@ function inferGlobalsFromImports(
   const specs: string[] = [];
   for (const re of [importRe, sideRe]) {
     re.lastIndex = 0;
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(source)) !== null) {
+    let m: RegExpExecArray | null = re.exec(source);
+    while (m !== null) {
       const spec = m[1];
       if (spec === undefined || !spec.includes("globals.css")) continue;
       if (!specs.includes(spec)) specs.push(spec);
+      m = re.exec(source);
     }
   }
   // Side-effect-only import `import "…globals.css"`
   const bareRe = /import\s+['"]([^'"]*globals\.css)['"]\s*;/g;
   bareRe.lastIndex = 0;
-  let bm: RegExpExecArray | null;
-  while ((bm = bareRe.exec(source)) !== null) {
+  let bm: RegExpExecArray | null = bareRe.exec(source);
+  while (bm !== null) {
     const spec = bm[1];
     if (spec === undefined || !spec.includes("globals.css")) continue;
     if (!specs.includes(spec)) specs.push(spec);
+    bm = bareRe.exec(source);
   }
 
   for (const spec of specs) {
@@ -70,7 +72,7 @@ function inferGlobalsFromImports(
 function resolveCssImportSpecifier(
   spec: string,
   layoutDir: string,
-  pkgRoot: string,
+  pkgRoot: string
 ): string | null {
   const s = spec;
   if (s.startsWith("@/")) {

@@ -35,7 +35,7 @@
 
 import type { Codemod } from "codemod:ast-grep";
 import type JSON_TYPES from "codemod:ast-grep/langs/json";
-import { readdirSync, readFileSync, statSync } from "fs";
+import { readdirSync, readFileSync, statSync, type Stats } from "fs";
 import { emitWorkflowStepReport, WORKFLOW_NODE_IDS } from "../utils/migration-run-report.ts";
 import { getFilename, normalizePath } from "../utils/paths.ts";
 import { hasFontsourcePackage, readSidecar } from "../utils/sidecar.ts";
@@ -92,7 +92,7 @@ const codemod: Codemod<JSON_TYPES> = async (root) => {
   const targetDir = inferTargetDir(file);
   const targetDirNorm = normalizePath(targetDir);
   const hadNextI18next = Boolean(
-    pkg.dependencies?.["next-i18next"] ?? pkg.devDependencies?.["next-i18next"],
+    pkg.dependencies?.["next-i18next"] ?? pkg.devDependencies?.["next-i18next"]
   );
 
   const emitReport = (manifestChanged: boolean): void => {
@@ -140,7 +140,7 @@ const codemod: Codemod<JSON_TYPES> = async (root) => {
   if (
     sourceTreeContains(
       targetDir,
-      /\bfrom\s+["']path-to-regexp["']|\brequire\s*\(\s*["']path-to-regexp["']\s*\)/,
+      /\bfrom\s+["']path-to-regexp["']|\brequire\s*\(\s*["']path-to-regexp["']\s*\)/
     )
   ) {
     ensureDep(pkg, "dependencies", "path-to-regexp", "latest");
@@ -203,7 +203,7 @@ export default codemod;
 function deleteDep(
   pkg: PackageJson,
   bucket: "dependencies" | "devDependencies",
-  name: string,
+  name: string
 ): void {
   const existing = pkg[bucket] as Record<string, string> | undefined;
   if (!existing) return;
@@ -215,7 +215,7 @@ function ensureDep(
   pkg: PackageJson,
   bucket: "dependencies" | "devDependencies",
   name: string,
-  version: string,
+  version: string
 ): void {
   if (!pkg[bucket]) pkg[bucket] = {};
   const existing = pkg[bucket] as Record<string, string>;
@@ -282,7 +282,8 @@ function sourceTreeContains(dir: string, needle: RegExp): boolean {
   ]);
   const stack = [dir];
   while (stack.length > 0) {
-    const current = stack.pop()!;
+    const current = stack.pop();
+    if (current === undefined) break;
     let entries: string[];
     try {
       entries = readdirSync(current);
@@ -292,7 +293,7 @@ function sourceTreeContains(dir: string, needle: RegExp): boolean {
     for (const name of entries) {
       if (ignored.has(name)) continue;
       const full = `${current}/${name}`;
-      let st;
+      let st: Stats;
       try {
         st = statSync(full);
       } catch {
@@ -320,11 +321,7 @@ function collectNextAdjacentDeps(pkg: PackageJson): string[] {
   for (const bucket of [pkg.dependencies, pkg.devDependencies]) {
     if (!bucket) continue;
     for (const name of Object.keys(bucket)) {
-      if (
-        name.startsWith("next-") ||
-        name.startsWith("@next/") ||
-        name === "@sentry/nextjs"
-      ) {
+      if (name.startsWith("next-") || name.startsWith("@next/") || name === "@sentry/nextjs") {
         names.add(name);
       }
     }

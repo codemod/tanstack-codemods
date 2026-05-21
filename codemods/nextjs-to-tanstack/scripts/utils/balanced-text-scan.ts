@@ -26,7 +26,11 @@ const DQ: "'" | '"' = "\u0022";
 
 function precedingNonWs(source: string, ltIdx: number): number {
   let j = ltIdx - 1;
-  while (j >= 0 && /[\t \r\n]/.test(source[j]!)) j--;
+  while (j >= 0) {
+    const ch = source[j];
+    if (ch === undefined || !/[\t \r\n]/.test(ch)) break;
+    j--;
+  }
   return j;
 }
 
@@ -40,9 +44,10 @@ export function isLikelyTsxJsxOpen(source: string, ltIdx: number): boolean {
   if (n1 === ">") return true;
   if (!/[A-Za-z_$]/.test(n1)) return false;
 
-  let j = precedingNonWs(source, ltIdx);
+  const j = precedingNonWs(source, ltIdx);
   if (j < 0) return true;
-  const c = source[j]!;
+  const c = source[j];
+  if (c === undefined) return true;
 
   if (c === "(") return true;
   if (/[,:=[{\[?!&|+\-*/%^~]/.test(c)) return true;
@@ -51,7 +56,11 @@ export function isLikelyTsxJsxOpen(source: string, ltIdx: number): boolean {
   if (c === ")") return true;
 
   let k = j;
-  while (k >= 0 && /[\w$]/.test(source[k]!)) k--;
+  while (k >= 0) {
+    const ch = source[k];
+    if (ch === undefined || !/[\w$]/.test(ch)) break;
+    k--;
+  }
   const word = source.slice(k + 1, j + 1);
   if (JSX_LEADING_WORDS.has(word)) return true;
 
@@ -193,11 +202,19 @@ function skipTsxElement(source: string, start: number): number {
   }
 
   const nameStart = i;
-  while (i < source.length && /[\w.$-]/.test(source[i]!)) i++;
+  while (i < source.length) {
+    const ch = source[i];
+    if (ch === undefined || !/[\w.$-]/.test(ch)) break;
+    i++;
+  }
   const tagName = source.slice(nameStart, i);
 
   while (i < source.length) {
-    while (i < source.length && /\s/.test(source[i]!)) i++;
+    while (i < source.length) {
+      const ws = source[i];
+      if (ws === undefined || !/\s/.test(ws)) break;
+      i++;
+    }
     if (i >= source.length) return source.length;
     if (source[i] === ">") {
       i++;
@@ -214,11 +231,23 @@ function skipTsxElement(source: string, start: number): number {
       continue;
     }
 
-    while (i < source.length && /[\w:$-]/.test(source[i]!)) i++;
-    while (i < source.length && /\s/.test(source[i]!)) i++;
+    while (i < source.length) {
+      const attrCh = source[i];
+      if (attrCh === undefined || !/[\w:$-]/.test(attrCh)) break;
+      i++;
+    }
+    while (i < source.length) {
+      const ws = source[i];
+      if (ws === undefined || !/\s/.test(ws)) break;
+      i++;
+    }
     if (i < source.length && source[i] === "=") {
       i++;
-      while (i < source.length && /\s/.test(source[i]!)) i++;
+      while (i < source.length) {
+        const eqWs = source[i];
+        if (eqWs === undefined || !/\s/.test(eqWs)) break;
+        i++;
+      }
       const q = source[i];
       if (q === '"' || q === "'") {
         i = skipStringLiteral(source, i, q);
@@ -227,7 +256,11 @@ function skipTsxElement(source: string, start: number): number {
         if (close === -1) return source.length;
         i = close + 1;
       } else {
-        while (i < source.length && !/\s/.test(source[i]!) && source[i] !== ">") i++;
+        while (i < source.length) {
+          const valCh = source[i];
+          if (valCh === undefined || /\s/.test(valCh) || valCh === ">") break;
+          i++;
+        }
       }
     }
   }

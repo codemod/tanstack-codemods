@@ -12,9 +12,15 @@ import { join } from "path";
 
 type RmOpts = { recursive?: boolean; force?: boolean };
 
-const _rmSync: ((p: string, o?: RmOpts) => void) | undefined = (_fs as any).rmSync;
-const _rmdirSync: ((p: string) => void) | undefined = (_fs as any).rmdirSync;
-const _unlinkSync: ((p: string) => void) | undefined = (_fs as any).unlinkSync;
+type FsWithOptionalRm = typeof _fs & {
+  rmSync?: (p: string, o?: RmOpts) => void;
+  rmdirSync?: (p: string) => void;
+  unlinkSync?: (p: string) => void;
+};
+const fsProbe = _fs as FsWithOptionalRm;
+const _rmSync = fsProbe.rmSync;
+const _rmdirSync = fsProbe.rmdirSync;
+const _unlinkSync = fsProbe.unlinkSync;
 
 export function safeRemoveFile(path: string): void {
   if (_rmSync) {

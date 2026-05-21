@@ -34,8 +34,7 @@ const codemod: Codemod<TSX> = async (root) => {
 
   const edits: Edit[] = [];
   const source = rootNode.text();
-  const hasAnyImport =
-    rootNode.find({ rule: { kind: "import_statement" } }) !== null;
+  const hasAnyImport = rootNode.find({ rule: { kind: "import_statement" } }) !== null;
 
   // Replace the directive with (optionally) the createServerFn import. This
   // avoids overlapping edits when the directive + import insert both land at
@@ -45,9 +44,7 @@ const codemod: Codemod<TSX> = async (root) => {
   edits.push({
     startPos: directiveStart,
     endPos: directiveEnd,
-    insertedText: hasAnyImport
-      ? ""
-      : `import { createServerFn } from "${TANSTACK_START}";\n\n`,
+    insertedText: hasAnyImport ? "" : `import { createServerFn } from "${TANSTACK_START}";\n\n`,
   });
 
   let rewrittenCount = 0;
@@ -147,7 +144,7 @@ function wrapArrow(exportStmt: SgNode<TSX>, arrow: SgNode<TSX>): Edit[] {
       startPos: arrow.range().end.index,
       endPos: arrow.range().end.index,
       insertedText: ")",
-    },
+    }
   );
   return edits;
 }

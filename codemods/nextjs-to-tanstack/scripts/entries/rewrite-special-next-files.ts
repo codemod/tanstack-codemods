@@ -83,17 +83,14 @@ const codemod: Codemod<TSX> = async (root) => {
   const routeBlock = buildSpecialRouteBlock(
     routeInfo.routePath,
     fnName,
-    routeInfo.routeOptionProperty,
+    routeInfo.routeOptionProperty
   );
 
   if (!hasAnyImport) {
     edits.push({
       startPos: exportStart,
       endPos: fnEnd,
-      insertedText:
-        `import { createFileRoute } from "${TANSTACK_ROUTER}";\n\n` +
-        source.slice(fnStart, fnEnd) +
-        `\n\n${routeBlock}`,
+      insertedText: `import { createFileRoute } from "${TANSTACK_ROUTER}";\n\n${source.slice(fnStart, fnEnd)}\n\n${routeBlock}`,
     });
   } else {
     edits.push({
@@ -138,7 +135,7 @@ function annotateTemplate(root: Parameters<Codemod<TSX>>[0]): string | null {
 
   const edit = insertReviewBefore(
     firstStmt,
-    "Next.js template.tsx has no direct TanStack Start equivalent — refactor manually",
+    "Next.js template.tsx has no direct TanStack Start equivalent — refactor manually"
   );
   return rootNode.commitEdits([edit]);
 }
@@ -146,19 +143,17 @@ function annotateTemplate(root: Parameters<Codemod<TSX>>[0]): string | null {
 function buildSpecialRouteBlock(
   routePath: string,
   componentName: string,
-  routeOptionProperty: "pendingComponent" | "errorComponent" | "notFoundComponent",
+  routeOptionProperty: "pendingComponent" | "errorComponent" | "notFoundComponent"
 ): string {
-  return (
-    `export const Route = createFileRoute(${JSON.stringify(routePath)})({\n` +
-    `  ${routeOptionProperty}: ${componentName},\n` +
-    `});`
-  );
+  return `export const Route = createFileRoute(${JSON.stringify(routePath)})({\n  ${routeOptionProperty}: ${componentName},\n});`;
 }
 
 function findDefaultExport(rootNode: SgNode<TSX>): SgNode<TSX> | null {
   for (const stmt of rootNode.children()) {
     if (stmt.kind() !== "export_statement") continue;
-    const hasDefault = stmt.children().some((c) => c.kind() === "default" || c.text() === "default");
+    const hasDefault = stmt
+      .children()
+      .some((c) => c.kind() === "default" || c.text() === "default");
     if (hasDefault) return stmt;
   }
   return null;

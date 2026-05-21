@@ -39,10 +39,7 @@ const codemod: Codemod<TSX> = async (root) => {
 export default codemod;
 
 function isAppRouterSourceFile(file: string): boolean {
-  return (
-    /(^|\/)src\/app\/.*\.(tsx|jsx)$/.test(file) ||
-    /(^|\/)app\/.*\.(tsx|jsx)$/.test(file)
-  );
+  return /(^|\/)src\/app\/.*\.(tsx|jsx)$/.test(file) || /(^|\/)app\/.*\.(tsx|jsx)$/.test(file);
 }
 
 function looksLikeNeedsStrip(source: string): boolean {
@@ -57,8 +54,7 @@ function looksLikeNeedsStrip(source: string): boolean {
   if (/serverSideTranslations/.test(source)) return true;
   if (/next\/head/.test(source)) return true;
   if (/from\s+["']next-i18next["']/.test(source)) return true;
-  if (/from\s+["']next-i18next\/serverSideTranslations["']/.test(source))
-    return true;
+  if (/from\s+["']next-i18next\/serverSideTranslations["']/.test(source)) return true;
   if (/\bimport\s+type\s+\{[^}]*\}\s+from\s+["']next["']/.test(source)) {
     return true;
   }
