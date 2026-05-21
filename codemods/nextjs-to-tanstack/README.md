@@ -19,7 +19,7 @@ npx codemod@latest run nextjs-to-tanstack -t /path/to/next-app
 npx codemod@latest workflow run --workflow workflow.yaml --target .
 ```
 
-Back up or commit first. Many files change; unmigrated `pages/` files may end up under `migrated-from-pages/`.
+Back up or commit first (recommended). Many files change; unmigrated `pages/` files may end up under `migrated-from-pages/`.
 
 ---
 
