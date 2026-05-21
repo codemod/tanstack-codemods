@@ -47,8 +47,8 @@ pnpm --filter <package-name> check-types
 For example:
 
 ```bash
-pnpm --filter @codemod/nextjs-to-tanstack test
-pnpm --filter @codemod/nextjs-to-tanstack check-types
+pnpm --filter nextjs-to-tanstack test
+pnpm --filter nextjs-to-tanstack check-types
 ```
 
 Use Node **22** locally (see [`.nvmrc`](./.nvmrc)) to match CI.
