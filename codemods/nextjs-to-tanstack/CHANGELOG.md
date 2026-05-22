@@ -1,5 +1,11 @@
 # nextjs-to-tanstack
 
+## 1.3.12
+
+### Patch Changes
+
+- 57be746: Update github repository address
+
 ## 1.3.11
 
 ### Patch Changes
