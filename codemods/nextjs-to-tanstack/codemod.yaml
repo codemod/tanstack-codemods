@@ -6,7 +6,7 @@ description: 'Migrate a project from the Next.js App Router to TanStack Start'
 author: 'Amirabbas Ghasemi <amirabbas08dev@gmail.com>'
 license: 'MIT'
 workflow: 'workflow.yaml'
-repository: 'https://github.com/amirabbas-gh/tanstack-codemods/tree/main/codemods/nextjs-to-tanstack'
+repository: 'https://github.com/codemod/tanstack-codemods/tree/main/codemods/nextjs-to-tanstack'
 
 targets:
   languages: ['tsx', 'ts', 'jsx', 'js', 'json', 'css']
