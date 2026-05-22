@@ -1,6 +1,6 @@
 {
   "name": "nextjs-to-tanstack",
-  "version": "1.3.11",
+  "version": "1.3.12",
   "description": "Migrate a project from the Next.js App Router to TanStack Start",
   "type": "module",
   "scripts": {
